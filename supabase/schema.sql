@@ -17,6 +17,7 @@ create table if not exists images (
   id uuid primary key default gen_random_uuid(),
   filename text not null,
   url text not null,
+  thumbnail_url text, -- small resized copy used for admin grid previews (fixes lag with many/large images)
   created_at timestamptz not null default now()
 );
 

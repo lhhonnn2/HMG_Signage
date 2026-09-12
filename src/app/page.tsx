@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { TV_IDS } from "@/lib/types";
+import { useTvNames } from "@/lib/useTvNames";
 
 export default function Home() {
+  const tvNames = useTvNames();
   return (
     <main style={{ maxWidth: 640, margin: "60px auto", padding: "0 20px" }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>📺 TV 사이니지 시스템</h1>
@@ -18,7 +22,7 @@ export default function Home() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
           {TV_IDS.map((id) => (
             <Link key={id} className="btn btn-outline" href={`/player/${id}`}>
-              TV {id} 송출화면
+              {tvNames[id]} 송출화면
             </Link>
           ))}
         </div>

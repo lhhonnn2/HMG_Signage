@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabaseClient";
 import type { AlarmRow, TvSettingsRow } from "@/lib/types";
 import { TV_IDS } from "@/lib/types";
+import { useTvNames } from "@/lib/useTvNames";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -59,6 +60,7 @@ function normalizeTimeCell(v: any): string {
 
 export default function AlarmsPage() {
   const [activeTv, setActiveTv] = useState(1);
+  const tvNames = useTvNames();
   const [rows, setRows] = useState<AlarmRow[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [duration, setDuration] = useState(30);
@@ -107,7 +109,7 @@ export default function AlarmsPage() {
     setSavingDuration(true);
     try {
       await supabase.from("tv_settings").upsert({ tv_id: activeTv, alarm_duration_seconds: duration });
-      alert(`TV ${activeTv}의 모든 알람에 노출 시간 ${duration}초가 적용됩니다`);
+      alert(`${tvNames[activeTv]}의 모든 알람에 노출 시간 ${duration}초가 적용됩니다`);
     } finally {
       setSavingDuration(false);
     }
@@ -173,7 +175,7 @@ export default function AlarmsPage() {
       const { error } = await supabase.from("alarms").insert(toInsert);
       if (error) throw error;
 
-      alert(`TV ${activeTv}에 ${toInsert.length}건 등록되었습니다`);
+      alert(`${tvNames[activeTv]}에 ${toInsert.length}건 등록되었습니다`);
       await load(toInsert[0]?.alarm_date);
     } catch (e: any) {
       alert("엑셀 업로드 중 오류: " + e.message);
@@ -205,16 +207,16 @@ export default function AlarmsPage() {
       <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
         {TV_IDS.map((id) => (
           <button key={id} className="chip" data-active={activeTv === id} onClick={() => setActiveTv(id)}>
-            TV {id}
+            {tvNames[id]}
           </button>
         ))}
         <a className="chip" href={`/player/${activeTv}`} target="_blank" rel="noreferrer" style={{ marginLeft: "auto" }}>
-          TV {activeTv} 화면 미리보기 ↗
+          {tvNames[activeTv]} 화면 미리보기 ↗
         </a>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>TV {activeTv} 알람 노출 시간</div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>{tvNames[activeTv]} 알람 노출 시간</div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
           이 TV의 모든 알람에 공통으로 적용됩니다. 알람마다 따로 설정하지 않습니다.
         </div>
@@ -228,7 +230,7 @@ export default function AlarmsPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ fontWeight: 600, marginBottom: 10 }}>TV {activeTv} — 엑셀로 일괄 등록</div>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>{tvNames[activeTv]} — 엑셀로 일괄 등록</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" disabled={importing} />
           <button className="btn btn-accent" disabled={importing} onClick={() => fileRef.current?.files?.[0] && onExcelFile(fileRef.current.files[0])}>
@@ -240,7 +242,7 @@ export default function AlarmsPage() {
         </div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
           엑셀 열: 날짜 · 알람시각 · 시작예정시각 · 프로그램명 · 렉처룸. 여러 날짜를 한 시트에 이어서 넣어도 올리고 나면 자동으로 날짜별 탭으로
-          나뉩니다. TV와 글자 크기/폰트는 여기(현재 TV {activeTv})와 "알람 서식 설정"에서 각각 적용되므로 엑셀에는 넣지 않습니다.
+          나뉩니다. TV와 글자 크기/폰트는 여기(현재 {tvNames[activeTv]})와 "알람 서식 설정"에서 각각 적용되므로 엑셀에는 넣지 않습니다.
         </div>
       </div>
 
@@ -256,7 +258,7 @@ export default function AlarmsPage() {
 
       {dates.length === 0 ? (
         <div className="card" style={{ color: "var(--muted)", fontSize: 14 }}>
-          TV {activeTv}에 등록된 알람이 없습니다. 위에서 날짜를 고르고 알람을 추가하거나 엑셀을 업로드하세요.
+          {tvNames[activeTv]}에 등록된 알람이 없습니다. 위에서 날짜를 고르고 알람을 추가하거나 엑셀을 업로드하세요.
         </div>
       ) : (
         <div className="card" style={{ overflowX: "auto" }}>

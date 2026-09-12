@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { TV_IDS } from "@/lib/types";
+import { useTvNames } from "@/lib/useTvNames";
 
 const NAV = [
   { href: "/admin", label: "대시보드" },
@@ -16,6 +17,7 @@ const NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const tvNames = useTvNames();
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -75,7 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 rel="noreferrer"
                 style={{ fontSize: 12, padding: "5px 10px" }}
               >
-                TV {id} ↗
+                {tvNames[id]} ↗
               </a>
             ))}
           </div>

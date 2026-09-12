@@ -75,7 +75,7 @@ export default function AlarmSettingsPage() {
     }
     setUploadingFont(true);
     try {
-      const url = await uploadFile(file, "fonts");
+      const url = await uploadFile(file, file.name, "fonts");
       const { data } = await supabase.from("fonts").insert({ name: newFontName.trim(), url }).select().single();
       setNewFontName("");
       if (fontInputRef.current) fontInputRef.current.value = "";

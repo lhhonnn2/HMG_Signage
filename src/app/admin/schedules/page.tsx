@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ImageRow, ScheduledImageSetRow } from "@/lib/types";
 import { WEEKDAY_LABELS, TV_IDS } from "@/lib/types";
+import { useTvNames } from "@/lib/useTvNames";
 
 export default function SchedulesPage() {
+  const tvNames = useTvNames();
   const [rows, setRows] = useState<ScheduledImageSetRow[]>([]);
   const [images, setImages] = useState<ImageRow[]>([]);
 
@@ -63,7 +65,7 @@ export default function SchedulesPage() {
             <select className="input" value={tvId} onChange={(e) => setTvId(Number(e.target.value))}>
               {TV_IDS.map((id) => (
                 <option key={id} value={id}>
-                  TV {id}
+                  {tvNames[id]}
                 </option>
               ))}
             </select>
@@ -104,7 +106,12 @@ export default function SchedulesPage() {
                   }}
                 >
                   <input type="checkbox" checked={checked} onChange={() => toggleImage(img.id)} />
-                  <img src={img.url} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 4 }} />
+                  <img
+                    src={img.thumbnail_url || img.url}
+                    loading="lazy"
+                    decoding="async"
+                    style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 4 }}
+                  />
                   <div
                     style={{
                       fontSize: 10.5,
@@ -132,7 +139,7 @@ export default function SchedulesPage() {
         {rows.map((r) => (
           <div key={r.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: 14 }}>
-              TV {r.tv_id} · {WEEKDAY_LABELS[r.weekday]}요일 · {r.start_time.slice(0, 5)}~{r.end_time.slice(0, 5)} · 이미지{" "}
+              {tvNames[r.tv_id]} · {WEEKDAY_LABELS[r.weekday]}요일 · {r.start_time.slice(0, 5)}~{r.end_time.slice(0, 5)} · 이미지{" "}
               {r.image_ids.length}장
             </div>
             <button className="btn btn-outline" onClick={() => remove(r.id)}>

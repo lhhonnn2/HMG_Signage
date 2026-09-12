@@ -60,7 +60,13 @@ export default function OrderedImagePicker({
                 textAlign: "left"
               }}
             >
-              <img src={img.url} alt={img.filename} style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 4 }} />
+              <img
+                src={img.thumbnail_url || img.url}
+                alt={img.filename}
+                loading="lazy"
+                decoding="async"
+                style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 4 }}
+              />
               <div
                 style={{
                   fontSize: 11,
@@ -117,7 +123,15 @@ export default function OrderedImagePicker({
                 >
                   <span style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1 }}>⠿</span>
                   <div style={{ fontSize: 12, color: "var(--muted)", width: 20 }}>{index + 1}</div>
-                  {img && <img src={img.url} alt={img.filename} style={{ width: 44, height: 30, objectFit: "cover", borderRadius: 4 }} />}
+                  {img && (
+                    <img
+                      src={img.thumbnail_url || img.url}
+                      alt={img.filename}
+                      loading="lazy"
+                      decoding="async"
+                      style={{ width: 44, height: 30, objectFit: "cover", borderRadius: 4 }}
+                    />
+                  )}
                   <div style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {img?.filename ?? "(삭제된 이미지)"}
                   </div>

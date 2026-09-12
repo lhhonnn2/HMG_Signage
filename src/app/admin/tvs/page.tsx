@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
 import type { ImageRow, ImageTemplateRow, TransitionEffect, TvAudioRow, TvSettingsRow } from "@/lib/types";
 import { TV_IDS } from "@/lib/types";
+import { useTvNames } from "@/lib/useTvNames";
 import OrderedImagePicker from "@/components/OrderedImagePicker";
 
 const TRANSITIONS: { value: TransitionEffect; label: string }[] = [
@@ -15,6 +16,8 @@ const TRANSITIONS: { value: TransitionEffect; label: string }[] = [
 
 export default function TvsPage() {
   const [activeTv, setActiveTv] = useState(1);
+  const tvNames = useTvNames();
+  const [tvName, setTvName] = useState("");
   const [images, setImages] = useState<ImageRow[]>([]);
   const [templates, setTemplates] = useState<ImageTemplateRow[]>([]);
   const [templateChoice, setTemplateChoice] = useState("");
@@ -26,6 +29,9 @@ export default function TvsPage() {
   const audioInputRef = useRef<HTMLInputElement>(null);
 
   async function loadAll() {
+    const { data: tvRow } = await supabase.from("tvs").select("*").eq("id", activeTv).maybeSingle();
+    setTvName((tvRow as any)?.name ?? `TV ${activeTv}`);
+
     const { data: imgs } = await supabase.from("images").select("*").order("created_at", { ascending: false });
     setImages(imgs || []);
 
@@ -63,6 +69,8 @@ export default function TvsPage() {
   async function save() {
     setSaving(true);
     try {
+      await supabase.from("tvs").update({ name: tvName.trim() || `TV ${activeTv}` }).eq("id", activeTv);
+
       await supabase.from("tv_settings").upsert({
         tv_id: activeTv,
         interval_seconds: interval,
@@ -91,7 +99,7 @@ export default function TvsPage() {
   async function onAudioUpload() {
     const file = audioInputRef.current?.files?.[0];
     if (!file) return;
-    const url = await uploadFile(file, "audio");
+    const url = await uploadFile(file, file.name, "audio");
     setAudio((a) => ({ ...a, audio_url: url }));
   }
 
@@ -103,12 +111,20 @@ export default function TvsPage() {
       <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
         {TV_IDS.map((id) => (
           <button key={id} className="chip" data-active={activeTv === id} onClick={() => setActiveTv(id)}>
-            TV {id}
+            {tvNames[id]}
           </button>
         ))}
         <a className="chip" href={`/player/${activeTv}`} target="_blank" rel="noreferrer" style={{ marginLeft: "auto" }}>
-          TV {activeTv} 화면 미리보기 ↗
+          {tvNames[activeTv]} 화면 미리보기 ↗
         </a>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <label className="label">이 TV의 이름</label>
+        <input className="input" style={{ maxWidth: 240 }} value={tvName} onChange={(e) => setTvName(e.target.value)} placeholder={`TV ${activeTv}`} />
+        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
+          관리자 화면 곳곳(탭, 바로가기 등)에 이 이름이 표시됩니다. 아래 "저장" 버튼을 눌러야 반영됩니다.
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16, display: "flex", gap: 24, flexWrap: "wrap" }}>

@@ -2,7 +2,13 @@ export type ImageRow = {
   id: string;
   filename: string;
   url: string;
+  thumbnail_url: string | null;
   created_at: string;
+};
+
+export type TvRow = {
+  id: number;
+  name: string;
 };
 
 export type ImageTemplateRow = {
