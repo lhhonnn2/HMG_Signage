@@ -108,7 +108,7 @@ export async function backfillThumbnail(url: string, filename: string) {
 
 export async function backfillThumbnailsInBatches(
   items: { id: string; url: string; filename: string }[],
-  onEach: (result: { id: string; thumbnailUrl: string | null }) => void | Promise<void>,
+  onEach: (result: { id: string; thumbnailUrl: string | null; error?: string }) => void | Promise<void>,
   concurrency = 3
 ) {
   const queue = [...items];
@@ -120,8 +120,8 @@ export async function backfillThumbnailsInBatches(
       try {
         const thumbnailUrl = await backfillThumbnail(item.url, item.filename);
         await onEach({ id: item.id, thumbnailUrl });
-      } catch {
-        await onEach({ id: item.id, thumbnailUrl: null });
+      } catch (err: any) {
+        await onEach({ id: item.id, thumbnailUrl: null, error: err?.message || String(err) });
       }
     }
   }

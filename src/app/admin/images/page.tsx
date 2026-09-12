@@ -10,9 +10,9 @@ export default function ImagesPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [dragOver, setDragOver] = useState(false);
-  const [search, setSearch] = useState("");
   const [backfilling, setBackfilling] = useState(false);
   const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0 });
+  const [backfillError, setBackfillError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -52,26 +52,34 @@ export default function ImagesPage() {
   async function backfillThumbnails() {
     if (missingThumbs.length === 0) return;
     setBackfilling(true);
+    setBackfillError(null);
     setBackfillProgress({ done: 0, total: missingThumbs.length });
+    let successCount = 0;
+    let firstError: string | null = null;
     try {
       await backfillThumbnailsInBatches(
         missingThumbs.map((i) => ({ id: i.id, url: i.url, filename: i.filename })),
-        async ({ id, thumbnailUrl }) => {
+        async ({ id, thumbnailUrl, error }) => {
           if (thumbnailUrl) {
             await supabase.from("images").update({ thumbnail_url: thumbnailUrl }).eq("id", id);
+            successCount++;
+          } else if (error && !firstError) {
+            firstError = error;
+            console.error("썸네일 생성 실패:", error);
           }
           setBackfillProgress((p) => ({ ...p, done: p.done + 1 }));
         }
       );
       await load();
+      if (successCount === 0 && firstError) {
+        setBackfillError(firstError);
+      } else if (firstError) {
+        setBackfillError(`${successCount}장 성공, 일부 실패 (예: ${firstError})`);
+      }
     } finally {
       setBackfilling(false);
     }
   }
-
-  const filtered = search.trim()
-    ? images.filter((i) => i.filename.toLowerCase().includes(search.trim().toLowerCase()))
-    : images;
 
   return (
     <div>
@@ -122,23 +130,25 @@ export default function ImagesPage() {
       </div>
 
       {missingThumbs.length > 0 && (
-        <div className="card" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 13 }}>
-            썸네일이 없는 이미지 <b>{missingThumbs.length}장</b>이 있습니다 — 그리드가 버벅이는 가장 흔한 원인입니다.
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 13 }}>
+              썸네일이 없는 이미지 <b>{missingThumbs.length}장</b>이 있습니다 — 그리드가 버벅이는 가장 흔한 원인입니다.
+            </div>
+            <button className="btn btn-accent" style={{ marginLeft: "auto" }} disabled={backfilling} onClick={backfillThumbnails}>
+              {backfilling ? `생성 중... (${backfillProgress.done}/${backfillProgress.total})` : "썸네일 일괄 생성"}
+            </button>
           </div>
-          <button className="btn btn-accent" style={{ marginLeft: "auto" }} disabled={backfilling} onClick={backfillThumbnails}>
-            {backfilling ? `생성 중... (${backfillProgress.done}/${backfillProgress.total})` : "썸네일 일괄 생성"}
-          </button>
+          {backfillError && (
+            <div style={{ fontSize: 12.5, color: "#e5484d", marginTop: 10, wordBreak: "break-all" }}>
+              오류: {backfillError}
+              <br />
+              대부분 Cloudflare R2 버킷의 CORS 설정에 GET이 허용돼 있지 않거나 AllowedOrigins가 지금 도메인과 다를 때 발생합니다. R2
+              버킷 Settings → CORS Policy를 확인해주세요.
+            </div>
+          )}
         </div>
       )}
-
-      <input
-        className="input"
-        style={{ marginBottom: 12, maxWidth: 280 }}
-        placeholder="파일명으로 검색..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
 
       <div
         style={{
@@ -147,7 +157,7 @@ export default function ImagesPage() {
           gap: 8
         }}
       >
-        {filtered.map((img) => (
+        {images.map((img) => (
           <div key={img.id} className="card" style={{ padding: 6 }}>
             <img
               src={img.thumbnail_url || img.url}
@@ -168,9 +178,6 @@ export default function ImagesPage() {
         ))}
       </div>
       {images.length === 0 && <div style={{ color: "var(--muted)", fontSize: 14 }}>업로드된 이미지가 없습니다.</div>}
-      {images.length > 0 && filtered.length === 0 && (
-        <div style={{ color: "var(--muted)", fontSize: 14 }}>"{search}"와 일치하는 이미지가 없습니다.</div>
-      )}
     </div>
   );
 }

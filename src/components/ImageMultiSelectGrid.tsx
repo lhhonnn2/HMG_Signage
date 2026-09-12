@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo } from "react";
 import type { ImageRow } from "@/lib/types";
 
 export default memo(function ImageMultiSelectGrid({
@@ -12,27 +12,12 @@ export default memo(function ImageMultiSelectGrid({
   selectedIds: string[];
   onToggle: (id: string) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const filtered = search.trim()
-    ? images.filter((i) => i.filename.toLowerCase().includes(search.trim().toLowerCase()))
-    : images;
-
   if (images.length === 0) {
     return <div style={{ color: "var(--muted)", fontSize: 13 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>;
   }
   return (
-    <div>
-      {images.length > 12 && (
-        <input
-          className="input"
-          style={{ marginBottom: 8, maxWidth: 240 }}
-          placeholder="파일명으로 검색..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 6 }}>
-        {filtered.map((img) => {
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 6 }}>
+      {images.map((img) => {
         const checked = selectedIds.includes(img.id);
         return (
           <label
@@ -67,7 +52,6 @@ export default memo(function ImageMultiSelectGrid({
           </label>
         );
       })}
-      </div>
     </div>
   );
 });
