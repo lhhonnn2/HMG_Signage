@@ -184,7 +184,91 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
 }
 
 function FullBleed({ children }: { children: React.ReactNode }) {
-  return <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", margin: 0 }}>{children}</div>;
+  return (
+    <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", margin: 0, position: "relative" }}>
+      {children}
+      <FullscreenButton />
+    </div>
+  );
+}
+
+// TVs running this in an embedded/kiosk browser usually have no keyboard,
+// so F11 isn't an option — this gives a tappable way to enter/exit
+// fullscreen. It stays put until you actually go fullscreen; once
+// fullscreen, it fades out after a few seconds so it doesn't sit on top of
+// the signage, and taps/mouse movement bring it back briefly.
+function FullscreenButton() {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function scheduleHide() {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setVisible(false), 4000);
+  }
+
+  useEffect(() => {
+    function onChange() {
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      setVisible(true);
+      if (fs) scheduleHide();
+      else if (hideTimer.current) clearTimeout(hideTimer.current);
+    }
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    function wake() {
+      setVisible(true);
+      scheduleHide();
+    }
+    window.addEventListener("mousemove", wake);
+    window.addEventListener("touchstart", wake);
+    return () => {
+      window.removeEventListener("mousemove", wake);
+      window.removeEventListener("touchstart", wake);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen]);
+
+  async function toggle() {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // some embedded/kiosk browsers don't support the Fullscreen API — nothing more we can do
+    }
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      style={{
+        position: "fixed",
+        bottom: 20,
+        right: 20,
+        zIndex: 9999,
+        padding: "10px 18px",
+        borderRadius: 8,
+        border: "1px solid rgba(255,255,255,0.25)",
+        background: "rgba(0,0,0,0.55)",
+        color: "#fff",
+        fontSize: 14,
+        cursor: "pointer",
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? "auto" : "none",
+        transition: "opacity 500ms ease"
+      }}
+    >
+      {isFullscreen ? "전체화면 종료" : "⤢ 전체화면"}
+    </button>
+  );
 }
 
 function ImageLoopView({ images, intervalSeconds }: { images: ImageRow[]; intervalSeconds: number }) {
