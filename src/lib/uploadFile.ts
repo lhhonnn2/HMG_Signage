@@ -98,8 +98,16 @@ export async function uploadImagesWithThumbnails(
 // For images uploaded before thumbnails existed (thumbnail_url is null):
 // fetches the already-uploaded original back down, makes a thumbnail from
 // it, and uploads just that — no need to re-upload the original again.
+//
+// The cache-busting query param + `cache: "no-store"` matter here: these
+// objects were likely fetched (and cached by Cloudflare's edge) before the
+// R2 bucket's CORS policy was configured, so a plain fetch can keep
+// getting served that old, header-less cached response even after CORS is
+// set up correctly. Forcing a fresh request sidesteps that stale cache.
 export async function backfillThumbnail(url: string, filename: string) {
-  const res = await fetch(url);
+  const bustUrl = `${url}${url.includes("?") ? "&" : "?"}cb=${Date.now()}`;
+  const res = await fetch(bustUrl, { cache: "no-store" });
+  if (!res.ok) throw new Error(`원본을 불러오지 못했습니다 (${res.status})`);
   const blob = await res.blob();
   const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
   const thumbBlob = await makeThumbnail(file);
