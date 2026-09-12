@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type { ImageRow } from "@/lib/types";
 
 // Click a thumbnail in the grid to append it to `value` (duplicates allowed).
@@ -15,13 +15,22 @@ export default function OrderedImagePicker({
   value: string[];
   onChange: (next: string[]) => void;
 }) {
-  const imageMap = new Map(images.map((i) => [i.id, i]));
+  const imageMap = useMemo(() => new Map(images.map((i) => [i.id, i])), [images]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
-  function add(id: string) {
-    onChange([...value, id]);
-  }
+  // Reads `value` via a ref instead of a closure dependency so this
+  // callback's identity stays stable across renders — that's what lets
+  // ImageGrid below stay memoized (and skip re-rendering) while the order
+  // list underneath re-renders constantly during a drag.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const add = useCallback(
+    (id: string) => {
+      onChange([...valueRef.current, id]);
+    },
+    [onChange]
+  );
 
   function removeAt(index: number) {
     onChange(value.filter((_, i) => i !== index));
@@ -45,46 +54,7 @@ export default function OrderedImagePicker({
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
         <div className="label">이미지를 클릭하면 재생목록 맨 뒤에 추가됩니다 (같은 이미지 여러 번 추가 가능)</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
-          {images.map((img) => (
-            <button
-              key={img.id}
-              type="button"
-              onClick={() => add(img.id)}
-              style={{
-                border: "1px solid var(--line)",
-                borderRadius: 8,
-                padding: 4,
-                cursor: "pointer",
-                background: "#fff",
-                textAlign: "left"
-              }}
-            >
-              <img
-                src={img.thumbnail_url || img.url}
-                alt={img.filename}
-                loading="lazy"
-                decoding="async"
-                style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 4 }}
-              />
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "var(--muted)",
-                  marginTop: 4,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap"
-                }}
-              >
-                {img.filename}
-              </div>
-            </button>
-          ))}
-        </div>
-        {images.length === 0 && (
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>
-        )}
+        <ImageGrid images={images} onAdd={add} />
       </div>
 
       <div>
@@ -92,7 +62,7 @@ export default function OrderedImagePicker({
         {value.length === 0 ? (
           <div style={{ color: "var(--muted)", fontSize: 13 }}>아직 추가된 이미지가 없습니다. 위에서 이미지를 클릭해 추가하세요.</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {value.map((id, index) => {
               const img = imageMap.get(id);
               return (
@@ -147,3 +117,52 @@ export default function OrderedImagePicker({
     </div>
   );
 }
+
+// Memoized separately so it only re-renders when the image library itself
+// changes — not on every drag-over event from the order list above, which
+// otherwise re-renders (and re-downloads nothing, but re-lays-out) the
+// entire grid dozens of times per second while dragging.
+const ImageGrid = memo(function ImageGrid({ images, onAdd }: { images: ImageRow[]; onAdd: (id: string) => void }) {
+  if (images.length === 0) {
+    return <div style={{ color: "var(--muted)", fontSize: 13 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>;
+  }
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
+      {images.map((img) => (
+        <button
+          key={img.id}
+          type="button"
+          onClick={() => onAdd(img.id)}
+          style={{
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            padding: 4,
+            cursor: "pointer",
+            background: "#fff",
+            textAlign: "left"
+          }}
+        >
+          <img
+            src={img.thumbnail_url || img.url}
+            alt={img.filename}
+            loading="lazy"
+            decoding="async"
+            style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 4 }}
+          />
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--muted)",
+              marginTop: 4,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }}
+          >
+            {img.filename}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+});

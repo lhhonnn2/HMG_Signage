@@ -33,7 +33,7 @@ export async function uploadFile(file: File | Blob, filename: string, folder: "i
 // actually fixes the "여러 장 올리면 버벅임" slowdown — the original still
 // gets uploaded in full quality for the TV screens, but every admin page
 // that shows a grid of thumbnails loads the small copy instead.
-async function makeThumbnail(file: File, maxDim = 480, quality = 0.75): Promise<Blob> {
+async function makeThumbnail(file: File, maxDim = 360, quality = 0.7): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
   const w = Math.max(1, Math.round(bitmap.width * scale));
@@ -67,4 +67,30 @@ export async function uploadImageWithThumbnail(file: File) {
   }
 
   return { url, thumbnailUrl };
+}
+
+// Uploading many files one at a time (await in a for-loop) means each
+// file's full round trip (thumbnail + original, two R2 PUTs) blocks the
+// next file from starting — that serial wait is a big part of what makes
+// "여러 장 올리기" feel slow. This runs a small worker pool instead, so
+// several files upload at once. `onEach` fires as soon as each file
+// finishes (not necessarily in the original order), so the caller can
+// insert into Supabase and update progress incrementally.
+export async function uploadImagesWithThumbnails(
+  files: File[],
+  onEach: (result: { file: File; url: string; thumbnailUrl: string }) => void | Promise<void>,
+  concurrency = 3
+) {
+  const queue = [...files];
+
+  async function worker() {
+    while (queue.length > 0) {
+      const file = queue.shift();
+      if (!file) return;
+      const { url, thumbnailUrl } = await uploadImageWithThumbnail(file);
+      await onEach({ file, url, thumbnailUrl });
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
 }

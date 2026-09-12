@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { uploadImageWithThumbnail } from "@/lib/uploadFile";
+import { uploadImagesWithThumbnails } from "@/lib/uploadFile";
 import type { ImageRow } from "@/lib/types";
 
 export default function ImagesPage() {
@@ -27,11 +27,10 @@ export default function ImagesPage() {
     setUploading(true);
     setProgress({ done: 0, total: list.length });
     try {
-      for (const file of list) {
-        const { url, thumbnailUrl } = await uploadImageWithThumbnail(file);
+      await uploadImagesWithThumbnails(list, async ({ file, url, thumbnailUrl }) => {
         await supabase.from("images").insert({ filename: file.name, url, thumbnail_url: thumbnailUrl });
         setProgress((p) => ({ ...p, done: p.done + 1 }));
-      }
+      });
       await load();
     } finally {
       setUploading(false);

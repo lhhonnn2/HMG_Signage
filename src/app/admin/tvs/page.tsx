@@ -28,15 +28,9 @@ export default function TvsPage() {
   const [saving, setSaving] = useState(false);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
-  async function loadAll() {
+  async function loadTvSpecific() {
     const { data: tvRow } = await supabase.from("tvs").select("*").eq("id", activeTv).maybeSingle();
     setTvName((tvRow as any)?.name ?? `TV ${activeTv}`);
-
-    const { data: imgs } = await supabase.from("images").select("*").order("created_at", { ascending: false });
-    setImages(imgs || []);
-
-    const { data: tpls } = await supabase.from("image_templates").select("*").order("name");
-    setTemplates(tpls || []);
 
     const { data: playlist } = await supabase
       .from("tv_playlists")
@@ -54,8 +48,24 @@ export default function TvsPage() {
     setAudio((audioRow as TvAudioRow | null) ?? { tv_id: activeTv, audio_url: null, audio_enabled: false });
   }
 
+  // Image library + templates rarely change while you're clicking between
+  // TV tabs, so these load once on mount instead of being re-fetched (and
+  // re-rendering the whole picker grid) every time activeTv changes.
   useEffect(() => {
-    loadAll();
+    supabase
+      .from("images")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setImages(data || []));
+    supabase
+      .from("image_templates")
+      .select("*")
+      .order("name")
+      .then(({ data }) => setTemplates(data || []));
+  }, []);
+
+  useEffect(() => {
+    loadTvSpecific();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTv]);
 
