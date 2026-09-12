@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { uploadImagesWithThumbnails } from "@/lib/uploadFile";
+import { uploadImagesWithThumbnails, backfillThumbnailsInBatches } from "@/lib/uploadFile";
 import type { ImageRow } from "@/lib/types";
 
 export default function ImagesPage() {
@@ -10,6 +10,9 @@ export default function ImagesPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [dragOver, setDragOver] = useState(false);
+  const [search, setSearch] = useState("");
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillProgress, setBackfillProgress] = useState({ done: 0, total: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -43,6 +46,32 @@ export default function ImagesPage() {
     await supabase.from("images").delete().eq("id", id);
     await load();
   }
+
+  const missingThumbs = images.filter((i) => !i.thumbnail_url);
+
+  async function backfillThumbnails() {
+    if (missingThumbs.length === 0) return;
+    setBackfilling(true);
+    setBackfillProgress({ done: 0, total: missingThumbs.length });
+    try {
+      await backfillThumbnailsInBatches(
+        missingThumbs.map((i) => ({ id: i.id, url: i.url, filename: i.filename })),
+        async ({ id, thumbnailUrl }) => {
+          if (thumbnailUrl) {
+            await supabase.from("images").update({ thumbnail_url: thumbnailUrl }).eq("id", id);
+          }
+          setBackfillProgress((p) => ({ ...p, done: p.done + 1 }));
+        }
+      );
+      await load();
+    } finally {
+      setBackfilling(false);
+    }
+  }
+
+  const filtered = search.trim()
+    ? images.filter((i) => i.filename.toLowerCase().includes(search.trim().toLowerCase()))
+    : images;
 
   return (
     <div>
@@ -92,6 +121,25 @@ export default function ImagesPage() {
         )}
       </div>
 
+      {missingThumbs.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13 }}>
+            썸네일이 없는 이미지 <b>{missingThumbs.length}장</b>이 있습니다 — 그리드가 버벅이는 가장 흔한 원인입니다.
+          </div>
+          <button className="btn btn-accent" style={{ marginLeft: "auto" }} disabled={backfilling} onClick={backfillThumbnails}>
+            {backfilling ? `생성 중... (${backfillProgress.done}/${backfillProgress.total})` : "썸네일 일괄 생성"}
+          </button>
+        </div>
+      )}
+
+      <input
+        className="input"
+        style={{ marginBottom: 12, maxWidth: 280 }}
+        placeholder="파일명으로 검색..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
       <div
         style={{
           display: "grid",
@@ -99,7 +147,7 @@ export default function ImagesPage() {
           gap: 8
         }}
       >
-        {images.map((img) => (
+        {filtered.map((img) => (
           <div key={img.id} className="card" style={{ padding: 6 }}>
             <img
               src={img.thumbnail_url || img.url}
@@ -120,6 +168,9 @@ export default function ImagesPage() {
         ))}
       </div>
       {images.length === 0 && <div style={{ color: "var(--muted)", fontSize: 14 }}>업로드된 이미지가 없습니다.</div>}
+      {images.length > 0 && filtered.length === 0 && (
+        <div style={{ color: "var(--muted)", fontSize: 14 }}>"{search}"와 일치하는 이미지가 없습니다.</div>
+      )}
     </div>
   );
 }

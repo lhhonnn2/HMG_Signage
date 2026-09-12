@@ -94,3 +94,37 @@ export async function uploadImagesWithThumbnails(
 
   await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
 }
+
+// For images uploaded before thumbnails existed (thumbnail_url is null):
+// fetches the already-uploaded original back down, makes a thumbnail from
+// it, and uploads just that — no need to re-upload the original again.
+export async function backfillThumbnail(url: string, filename: string) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+  const thumbBlob = await makeThumbnail(file);
+  return uploadFile(thumbBlob, `thumb-${filename.replace(/\.[^.]+$/, "")}.jpg`, "thumbnails");
+}
+
+export async function backfillThumbnailsInBatches(
+  items: { id: string; url: string; filename: string }[],
+  onEach: (result: { id: string; thumbnailUrl: string | null }) => void | Promise<void>,
+  concurrency = 3
+) {
+  const queue = [...items];
+
+  async function worker() {
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (!item) return;
+      try {
+        const thumbnailUrl = await backfillThumbnail(item.url, item.filename);
+        await onEach({ id: item.id, thumbnailUrl });
+      } catch {
+        await onEach({ id: item.id, thumbnailUrl: null });
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+}
