@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ImageRow, ImageTemplateRow } from "@/lib/types";
+import OrderedImagePicker from "@/components/OrderedImagePicker";
 
 export default function ImageTemplatesPage() {
   const [images, setImages] = useState<ImageRow[]>([]);
@@ -21,10 +22,6 @@ export default function ImageTemplatesPage() {
   useEffect(() => {
     load();
   }, []);
-
-  function toggleImage(id: string) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
 
   function startEdit(t: ImageTemplateRow) {
     setEditingId(t.id);
@@ -70,37 +67,13 @@ export default function ImageTemplatesPage() {
         자주 함께 쓰는 이미지들을 묶어두면, TV 설정 화면에서 하나씩 고르지 않고 템플릿 이름만 선택해 한 번에 재생목록에 추가할 수 있습니다.
       </div>
 
-      <div className="card" style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="card" style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <label className="label">템플릿 이름</label>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 평일 오전 기본 세트" />
         </div>
 
-        <div>
-          <label className="label">포함할 이미지</label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
-            {images.map((img) => {
-              const checked = selectedIds.includes(img.id);
-              return (
-                <label
-                  key={img.id}
-                  style={{
-                    border: checked ? "2px solid var(--accent)" : "1px solid var(--line)",
-                    borderRadius: 8,
-                    padding: 4,
-                    cursor: "pointer"
-                  }}
-                >
-                  <input type="checkbox" checked={checked} onChange={() => toggleImage(img.id)} />
-                  <img src={img.url} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 4 }} />
-                </label>
-              );
-            })}
-          </div>
-          {images.length === 0 && (
-            <div style={{ color: "var(--muted)", fontSize: 13 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>
-          )}
-        </div>
+        <OrderedImagePicker images={images} value={selectedIds} onChange={setSelectedIds} />
 
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn btn-accent" onClick={save}>

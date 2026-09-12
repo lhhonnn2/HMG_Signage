@@ -1,5 +1,7 @@
 -- Run this once in the Supabase SQL editor (Project > SQL Editor > New query).
--- If you already ran an earlier version of this file, use supabase/migration_v2.sql instead.
+-- Upgrading from an earlier version? Use the matching migration file instead:
+--   supabase/migration_v2.sql — if you were on the very first schema
+--   supabase/migration_v3.sql — if you already applied migration_v2.sql
 
 create extension if not exists pgcrypto;
 
@@ -18,8 +20,8 @@ create table if not exists images (
   created_at timestamptz not null default now()
 );
 
--- Reusable bundles of images ("자주 쓰는 이미지 묶음") that can be applied
--- to a TV's playlist in one click instead of picking images one by one.
+-- Reusable bundles of images ("자주 쓰는 이미지 묶음"). image_ids is ordered
+-- and may contain the same image more than once (repeats are allowed).
 create table if not exists image_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -34,14 +36,19 @@ create table if not exists fonts (
 
 create table if not exists tv_settings (
   tv_id smallint primary key references tvs(id) on delete cascade,
-  interval_seconds int not null default 5
+  interval_seconds int not null default 5,           -- 이미지 전환 간격(초)
+  transition_effect text not null default 'cut',      -- 'cut' | 'fade' | 'slide'
+  alarm_duration_seconds int not null default 30,      -- 이 TV의 모든 알람에 일괄 적용되는 노출 시간(초)
+  check (transition_effect in ('cut', 'fade', 'slide'))
 );
 
+-- Ordered playlist; the same image can appear more than once (sort_order
+-- is the row's position, id lets a single image be listed several times).
 create table if not exists tv_playlists (
+  id uuid primary key default gen_random_uuid(),
   tv_id smallint references tvs(id) on delete cascade,
   image_id uuid references images(id) on delete cascade,
-  sort_order int not null default 0,
-  primary key (tv_id, image_id)
+  sort_order int not null default 0
 );
 
 create table if not exists scheduled_image_sets (
@@ -60,7 +67,8 @@ create table if not exists tv_audio (
 );
 
 -- One alarm belongs to exactly one TV — each TV's alarm list is managed
--- and displayed independently (no more shared multi-TV alarms).
+-- and displayed independently. Duration is not stored per alarm; every
+-- alarm on a TV uses that TV's tv_settings.alarm_duration_seconds.
 create table if not exists alarms (
   id uuid primary key default gen_random_uuid(),
   tv_id smallint not null references tvs(id) on delete cascade,
@@ -68,8 +76,7 @@ create table if not exists alarms (
   alarm_time time not null,          -- 알람시각: 이 시각에 알람 화면이 뜨기 시작함
   scheduled_time time not null,      -- 시작예정시각: 알람 문구에 표시되는 "시작 시간"
   program_name text not null,        -- 프로그램명
-  location text not null,            -- 장소(렉처룸)
-  duration_seconds int not null default 30 -- 알람 화면 노출 길이. 엑셀에는 없고, 등록 시 기본 설정값이 채워지며 표에서 개별 수정 가능
+  location text not null             -- 장소(렉처룸)
 );
 
 create index if not exists alarms_tv_date_idx on alarms (tv_id, alarm_date);
@@ -80,7 +87,6 @@ create table if not exists alarm_settings (
   id int primary key default 1,
   font_id uuid references fonts(id) on delete set null,
   line_font_sizes jsonb not null default '[40,28,28,24]', -- 템플릿 줄 순서대로 매칭되는 글자 크기(px) 배열
-  duration_seconds int not null default 30, -- 새 알람을 추가할 때 채워지는 기본 노출 시간
   template text not null default 'ANNOUNCEMENT
 [프로그램명],[장소]에서 시작됩니다.
 해당 장소 앞으로 이동해주세요.

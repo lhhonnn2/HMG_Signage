@@ -11,8 +11,7 @@ const NAV = [
   { href: "/admin/tvs", label: "TV 설정" },
   { href: "/admin/schedules", label: "요일별 이미지" },
   { href: "/admin/alarms", label: "알람 스케줄" },
-  { href: "/admin/settings", label: "알람 서식 설정" },
-  { href: "/admin/fonts", label: "폰트" }
+  { href: "/admin/settings", label: "알람 서식 설정" }
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

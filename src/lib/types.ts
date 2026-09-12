@@ -8,7 +8,7 @@ export type ImageRow = {
 export type ImageTemplateRow = {
   id: string;
   name: string;
-  image_ids: string[];
+  image_ids: string[]; // ordered, may contain duplicates
 };
 
 export type FontRow = {
@@ -17,12 +17,17 @@ export type FontRow = {
   url: string;
 };
 
+export type TransitionEffect = "cut" | "fade" | "slide";
+
 export type TvSettingsRow = {
   tv_id: number;
   interval_seconds: number;
+  transition_effect: TransitionEffect;
+  alarm_duration_seconds: number;
 };
 
 export type TvPlaylistRow = {
+  id: string;
   tv_id: number;
   image_id: string;
   sort_order: number;
@@ -51,14 +56,12 @@ export type AlarmRow = {
   scheduled_time: string; // HH:MM:SS — the announced program start time shown in the text
   program_name: string;
   location: string;
-  duration_seconds: number;
 };
 
 export type AlarmSettingsRow = {
   id: number;
   font_id: string | null;
   line_font_sizes: number[];
-  duration_seconds: number;
   template: string;
 };
 

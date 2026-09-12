@@ -2,10 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  renderAlarmLines,
-  DEFAULT_TEMPLATE
-} from "@/lib/types";
+import { renderAlarmLines, DEFAULT_TEMPLATE } from "@/lib/types";
 import type {
   AlarmRow,
   AlarmSettingsRow,
@@ -17,7 +14,8 @@ import type {
   TvSettingsRow
 } from "@/lib/types";
 
-const ROTATE_EVERY_MS = 5000; // when 3+ alarms overlap, how long each one shows before rotating
+const ROTATE_EVERY_MS = 5000; // how long each pair/leftover of overlapping alarms shows before rotating
+const TRANSITION_MS = 700;
 
 function todayStr() {
   const d = new Date();
@@ -28,9 +26,9 @@ function alarmStart(a: AlarmRow) {
   return new Date(`${a.alarm_date}T${a.alarm_time}`);
 }
 
-function isAlarmActive(a: AlarmRow, now: Date) {
+function isAlarmActive(a: AlarmRow, now: Date, durationSeconds: number) {
   const start = alarmStart(a);
-  const end = new Date(start.getTime() + a.duration_seconds * 1000);
+  const end = new Date(start.getTime() + durationSeconds * 1000);
   return now >= start && now <= end;
 }
 
@@ -41,25 +39,34 @@ function timeInWindow(now: Date, startHHMMSS: string, endHHMMSS: string) {
   return nowMin >= sh * 60 + sm && nowMin <= eh * 60 + em;
 }
 
+function pairsOf<T>(arr: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
+  return out;
+}
+
 export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const tvId = Number(params.tvId);
 
   const [images, setImages] = useState<ImageRow[]>([]);
   const [playlist, setPlaylist] = useState<TvPlaylistRow[]>([]);
   const [scheduledSets, setScheduledSets] = useState<ScheduledImageSetRow[]>([]);
-  const [settings, setSettings] = useState<TvSettingsRow>({ tv_id: tvId, interval_seconds: 5 });
+  const [settings, setSettings] = useState<TvSettingsRow>({
+    tv_id: tvId,
+    interval_seconds: 5,
+    transition_effect: "cut",
+    alarm_duration_seconds: 30
+  });
   const [audio, setAudio] = useState<TvAudioRow | null>(null);
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
   const [alarmSettings, setAlarmSettings] = useState<AlarmSettingsRow>({
     id: 1,
     font_id: null,
     line_font_sizes: [40, 28, 28, 24],
-    duration_seconds: 30,
     template: DEFAULT_TEMPLATE
   });
   const [fonts, setFonts] = useState<FontRow[]>([]);
   const [now, setNow] = useState(new Date());
-  const [imgIndex, setImgIndex] = useState(0);
   const [rotateIndex, setRotateIndex] = useState(0);
 
   async function loadData() {
@@ -86,7 +93,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
 
   useEffect(() => {
     loadData();
-    const dataTimer = setInterval(loadData, 60_000); // pick up admin changes without manual refresh
+    const dataTimer = setInterval(loadData, 60_000);
 
     const channel = supabase
       .channel(`tv-${tvId}-updates`)
@@ -118,35 +125,21 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     const extra = scheduledSets
       .filter((s) => s.weekday === weekday && timeInWindow(now, s.start_time, s.end_time))
       .flatMap((s) => s.image_ids.map((id) => imageMap.get(id)).filter(Boolean) as ImageRow[]);
-
-    const merged = [...base, ...extra];
-    const seen = new Set<string>();
-    return merged.filter((img) => (seen.has(img.id) ? false : (seen.add(img.id), true)));
+    return [...base, ...extra];
   }, [playlist, scheduledSets, imageMap, now]);
 
-  useEffect(() => {
-    if (currentLoopImages.length === 0) return;
-    const ms = Math.max(1, settings.interval_seconds) * 1000;
-    const t = setInterval(() => {
-      setImgIndex((i) => (i + 1) % currentLoopImages.length);
-    }, ms);
-    return () => clearInterval(t);
-  }, [currentLoopImages.length, settings.interval_seconds]);
+  const activeAlarms = useMemo(
+    () => alarms.filter((a) => isAlarmActive(a, now, settings.alarm_duration_seconds)),
+    [alarms, now, settings.alarm_duration_seconds]
+  );
 
   useEffect(() => {
-    setImgIndex(0);
-  }, [currentLoopImages.length]);
-
-  const activeAlarms = useMemo(() => alarms.filter((a) => isAlarmActive(a, now)), [alarms, now]);
-
-  useEffect(() => {
-    if (activeAlarms.length <= 2) {
+    const groupCount = Math.ceil(activeAlarms.length / 2);
+    if (groupCount <= 1) {
       setRotateIndex(0);
       return;
     }
-    const t = setInterval(() => {
-      setRotateIndex((i) => (i + 1) % activeAlarms.length);
-    }, ROTATE_EVERY_MS);
+    const t = setInterval(() => setRotateIndex((i) => (i + 1) % groupCount), ROTATE_EVERY_MS);
     return () => clearInterval(t);
   }, [activeAlarms.length]);
 
@@ -154,10 +147,9 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const activeFont = fonts.find((f) => f.id === alarmSettings.font_id);
 
   if (activeAlarms.length === 0) {
-    const img = currentLoopImages[imgIndex % Math.max(1, currentLoopImages.length)];
     return (
       <FullBleed>
-        {img ? <img src={img.url} style={{ width: "100vw", height: "100vh", objectFit: "cover" }} alt="" /> : null}
+        <ImageLoopView images={currentLoopImages} intervalSeconds={settings.interval_seconds} transition={settings.transition_effect} />
       </FullBleed>
     );
   }
@@ -171,26 +163,23 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     );
   }
 
-  if (activeAlarms.length === 2) {
-    return (
-      <FullBleed>
-        <div style={{ display: "flex", width: "100vw", height: "100vh" }}>
-          <div style={{ width: "50vw", height: "100vh", borderRight: "1px solid #222" }}>
-            <AlarmView alarm={activeAlarms[0]} settings={alarmSettings} font={activeFont} compact />
-          </div>
-          <div style={{ width: "50vw", height: "100vh" }}>
-            <AlarmView alarm={activeAlarms[1]} settings={alarmSettings} font={activeFont} compact />
-          </div>
-        </div>
-        {shouldPlayAudio && <LoopAudio src={audio!.audio_url!} />}
-      </FullBleed>
-    );
-  }
+  const groups = pairsOf(activeAlarms);
+  const group = groups[rotateIndex % groups.length];
 
-  const current = activeAlarms[rotateIndex % activeAlarms.length];
   return (
     <FullBleed>
-      <AlarmView alarm={current} settings={alarmSettings} font={activeFont} />
+      {group.length === 2 ? (
+        <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "100vh" }}>
+          <div style={{ width: "100vw", height: "50vh", borderBottom: "1px solid #222" }}>
+            <AlarmView alarm={group[0]} settings={alarmSettings} font={activeFont} compact />
+          </div>
+          <div style={{ width: "100vw", height: "50vh" }}>
+            <AlarmView alarm={group[1]} settings={alarmSettings} font={activeFont} compact />
+          </div>
+        </div>
+      ) : (
+        <AlarmView alarm={group[0]} settings={alarmSettings} font={activeFont} />
+      )}
       {shouldPlayAudio && <LoopAudio src={audio!.audio_url!} />}
     </FullBleed>
   );
@@ -198,6 +187,82 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
 
 function FullBleed({ children }: { children: React.ReactNode }) {
   return <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", margin: 0 }}>{children}</div>;
+}
+
+function ImageLoopView({
+  images,
+  intervalSeconds,
+  transition
+}: {
+  images: ImageRow[];
+  intervalSeconds: number;
+  transition: "cut" | "fade" | "slide";
+}) {
+  const [index, setIndex] = useState(0);
+  const [prevIndex, setPrevIndex] = useState<number | null>(null);
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    setIndex(0);
+    setPrevIndex(null);
+  }, [images.length]);
+
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const ms = Math.max(1, intervalSeconds) * 1000;
+    const t = setInterval(() => {
+      setIndex((i) => {
+        setPrevIndex(i);
+        return (i + 1) % images.length;
+      });
+    }, ms);
+    return () => clearInterval(t);
+  }, [images.length, intervalSeconds]);
+
+  useEffect(() => {
+    if (prevIndex === null) return;
+    setEntered(false);
+    const raf = requestAnimationFrame(() => setEntered(true));
+    const timeout = setTimeout(() => setPrevIndex(null), TRANSITION_MS);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  if (images.length === 0) return null;
+  const current = images[index % images.length];
+  const prev = prevIndex !== null ? images[prevIndex % images.length] : null;
+
+  if (transition === "cut" || !prev) {
+    return <img src={current.url} style={{ width: "100vw", height: "100vh", objectFit: "cover" }} alt="" />;
+  }
+
+  const baseImgStyle: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover"
+  };
+
+  const prevStyle: React.CSSProperties =
+    transition === "fade"
+      ? { ...baseImgStyle, opacity: entered ? 0 : 1, transition: `opacity ${TRANSITION_MS}ms ease` }
+      : { ...baseImgStyle, transform: entered ? "translateX(-100%)" : "translateX(0)", transition: `transform ${TRANSITION_MS}ms ease` };
+
+  const currentStyle: React.CSSProperties =
+    transition === "fade"
+      ? { ...baseImgStyle, opacity: entered ? 1 : 0, transition: `opacity ${TRANSITION_MS}ms ease` }
+      : { ...baseImgStyle, transform: entered ? "translateX(0)" : "translateX(100%)", transition: `transform ${TRANSITION_MS}ms ease` };
+
+  return (
+    <div style={{ position: "relative", width: "100vw", height: "100vh", overflow: "hidden" }}>
+      <img src={prev.url} style={prevStyle} alt="" />
+      <img src={current.url} style={currentStyle} alt="" />
+    </div>
+  );
 }
 
 function AlarmView({
@@ -240,15 +305,7 @@ function AlarmView({
       {lines.map((text, i) => {
         const size = settings.line_font_sizes[i] ?? settings.line_font_sizes[settings.line_font_sizes.length - 1] ?? 28;
         return (
-          <div
-            key={i}
-            style={{
-              fontFamily,
-              fontSize: Math.max(10, Math.round(size * scale)),
-              fontWeight: i === 0 ? 700 : 500,
-              lineHeight: 1.4
-            }}
-          >
+          <div key={i} style={{ fontFamily, fontSize: Math.max(10, Math.round(size * scale)), fontWeight: i === 0 ? 700 : 500, lineHeight: 1.4 }}>
             {text}
           </div>
         );
@@ -260,10 +317,7 @@ function AlarmView({
 function LoopAudio({ src }: { src: string }) {
   const ref = useRef<HTMLAudioElement>(null);
   useEffect(() => {
-    ref.current?.play().catch(() => {
-      // autoplay blocked until the browser registers a user gesture once —
-      // kiosk browsers are typically launched with autoplay allowed
-    });
+    ref.current?.play().catch(() => {});
   }, [src]);
   return <audio ref={ref} src={src} loop autoPlay style={{ display: "none" }} />;
 }

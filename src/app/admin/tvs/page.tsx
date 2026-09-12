@@ -3,8 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
-import type { ImageRow, ImageTemplateRow, TvAudioRow, TvSettingsRow } from "@/lib/types";
+import type { ImageRow, ImageTemplateRow, TransitionEffect, TvAudioRow, TvSettingsRow } from "@/lib/types";
 import { TV_IDS } from "@/lib/types";
+import OrderedImagePicker from "@/components/OrderedImagePicker";
+
+const TRANSITIONS: { value: TransitionEffect; label: string }[] = [
+  { value: "cut", label: "즉시 전환 (효과 없음)" },
+  { value: "fade", label: "페이드 (크로스페이드)" },
+  { value: "slide", label: "슬라이드" }
+];
 
 export default function TvsPage() {
   const [activeTv, setActiveTv] = useState(1);
@@ -13,6 +20,7 @@ export default function TvsPage() {
   const [templateChoice, setTemplateChoice] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [interval, setIntervalSec] = useState(5);
+  const [transition, setTransition] = useState<TransitionEffect>("cut");
   const [audio, setAudio] = useState<TvAudioRow>({ tv_id: activeTv, audio_url: null, audio_enabled: false });
   const [saving, setSaving] = useState(false);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +40,9 @@ export default function TvsPage() {
     setSelectedIds((playlist || []).map((p) => p.image_id));
 
     const { data: settings } = await supabase.from("tv_settings").select("*").eq("tv_id", activeTv).maybeSingle();
-    setIntervalSec((settings as TvSettingsRow | null)?.interval_seconds ?? 5);
+    const s = settings as TvSettingsRow | null;
+    setIntervalSec(s?.interval_seconds ?? 5);
+    setTransition(s?.transition_effect ?? "cut");
 
     const { data: audioRow } = await supabase.from("tv_audio").select("*").eq("tv_id", activeTv).maybeSingle();
     setAudio((audioRow as TvAudioRow | null) ?? { tv_id: activeTv, audio_url: null, audio_enabled: false });
@@ -43,25 +53,27 @@ export default function TvsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTv]);
 
-  function toggleImage(id: string) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
   function applyTemplate() {
     const t = templates.find((x) => x.id === templateChoice);
     if (!t) return;
-    setSelectedIds((prev) => Array.from(new Set([...prev, ...t.image_ids])));
+    setSelectedIds((prev) => [...prev, ...t.image_ids]);
     setTemplateChoice("");
   }
 
   async function save() {
     setSaving(true);
     try {
-      await supabase.from("tv_settings").upsert({ tv_id: activeTv, interval_seconds: interval });
+      await supabase.from("tv_settings").upsert({
+        tv_id: activeTv,
+        interval_seconds: interval,
+        transition_effect: transition
+      });
 
       await supabase.from("tv_playlists").delete().eq("tv_id", activeTv);
       if (selectedIds.length > 0) {
-        await supabase.from("tv_playlists").insert(selectedIds.map((image_id, i) => ({ tv_id: activeTv, image_id, sort_order: i })));
+        await supabase
+          .from("tv_playlists")
+          .insert(selectedIds.map((image_id, i) => ({ tv_id: activeTv, image_id, sort_order: i })));
       }
 
       await supabase.from("tv_audio").upsert({
@@ -86,7 +98,7 @@ export default function TvsPage() {
   return (
     <div>
       <div className="page-title">TV 설정</div>
-      <div className="page-subtitle">TV별로 재생목록, 전환 속도, 알람 음원을 따로 설정합니다.</div>
+      <div className="page-subtitle">TV별로 재생목록, 전환 효과·속도, 알람 음원을 따로 설정합니다.</div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
         {TV_IDS.map((id) => (
@@ -99,16 +111,28 @@ export default function TvsPage() {
         </a>
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <label className="label">이미지 전환 속도 (초)</label>
-        <input
-          className="input"
-          type="number"
-          min={1}
-          style={{ width: 120 }}
-          value={interval}
-          onChange={(e) => setIntervalSec(Number(e.target.value))}
-        />
+      <div className="card" style={{ marginBottom: 16, display: "flex", gap: 24, flexWrap: "wrap" }}>
+        <div>
+          <label className="label">이미지 전환 속도 (초)</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            style={{ width: 120 }}
+            value={interval}
+            onChange={(e) => setIntervalSec(Number(e.target.value))}
+          />
+        </div>
+        <div>
+          <label className="label">전환 효과</label>
+          <select className="input" style={{ width: 200 }} value={transition} onChange={(e) => setTransition(e.target.value as TransitionEffect)}>
+            {TRANSITIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -133,7 +157,7 @@ export default function TvsPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 12 }}>재생목록 (선택한 이미지가 이 TV에서 루핑됩니다)</div>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>재생목록</div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
           <select className="input" style={{ width: 220 }} value={templateChoice} onChange={(e) => setTemplateChoice(e.target.value)}>
@@ -145,37 +169,16 @@ export default function TvsPage() {
             ))}
           </select>
           <button className="btn btn-outline" disabled={!templateChoice} onClick={applyTemplate}>
-            추가
+            뒤에 추가
           </button>
           {selectedIds.length > 0 && (
             <button className="btn btn-outline" onClick={() => setSelectedIds([])} style={{ marginLeft: "auto" }}>
-              전체 해제
+              전체 비우기
             </button>
           )}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-          {images.map((img) => {
-            const checked = selectedIds.includes(img.id);
-            return (
-              <label
-                key={img.id}
-                style={{
-                  border: checked ? "2px solid var(--accent)" : "1px solid var(--line)",
-                  borderRadius: 8,
-                  padding: 6,
-                  cursor: "pointer"
-                }}
-              >
-                <input type="checkbox" checked={checked} onChange={() => toggleImage(img.id)} style={{ marginBottom: 4 }} />
-                <img src={img.url} alt={img.filename} style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }} />
-              </label>
-            );
-          })}
-        </div>
-        {images.length === 0 && (
-          <div style={{ color: "var(--muted)", fontSize: 14 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>
-        )}
+        <OrderedImagePicker images={images} value={selectedIds} onChange={setSelectedIds} />
       </div>
 
       <button className="btn btn-accent" disabled={saving} onClick={save}>

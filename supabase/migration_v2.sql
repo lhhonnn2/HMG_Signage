@@ -11,7 +11,8 @@ create table if not exists image_templates (
   image_ids uuid[] not null default '{}'
 );
 alter table image_templates enable row level security;
-create policy if not exists "public rw image_templates" on image_templates for all using (true) with check (true);
+drop policy if exists "public rw image_templates" on image_templates;
+create policy "public rw image_templates" on image_templates for all using (true) with check (true);
 
 -- 2) Global alarm settings (new)
 create table if not exists alarm_settings (
@@ -27,7 +28,8 @@ create table if not exists alarm_settings (
 );
 insert into alarm_settings (id) values (1) on conflict (id) do nothing;
 alter table alarm_settings enable row level security;
-create policy if not exists "public rw alarm_settings" on alarm_settings for all using (true) with check (true);
+drop policy if exists "public rw alarm_settings" on alarm_settings;
+create policy "public rw alarm_settings" on alarm_settings for all using (true) with check (true);
 
 -- 3) alarms table: move from multi-TV (tv_ids array) to single tv_id,
 --    rename start_time -> alarm_time, add scheduled_time, drop per-alarm
