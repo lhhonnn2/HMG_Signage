@@ -105,6 +105,18 @@ export default function SchedulesPage() {
                 >
                   <input type="checkbox" checked={checked} onChange={() => toggleImage(img.id)} />
                   <img src={img.url} style={{ width: "100%", height: 60, objectFit: "cover", borderRadius: 4 }} />
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      color: "var(--muted)",
+                      marginTop: 3,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {img.filename}
+                  </div>
                 </label>
               );
             })}

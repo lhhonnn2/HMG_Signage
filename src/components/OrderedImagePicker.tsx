@@ -1,11 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import type { ImageRow } from "@/lib/types";
 
 // Click a thumbnail in the grid to append it to `value` (duplicates allowed).
-// The ordered list underneath shows the actual playback order and lets you
-// remove any single occurrence with "제외" — this is not a select/deselect
-// toggle, it's an append-only picker plus a remove-from-list action.
+// The list underneath shows the actual playback order — drag rows to
+// reorder, or hit "제외" to remove a single occurrence.
 export default function OrderedImagePicker({
   images,
   value,
@@ -16,6 +16,8 @@ export default function OrderedImagePicker({
   onChange: (next: string[]) => void;
 }) {
   const imageMap = new Map(images.map((i) => [i.id, i]));
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
   function add(id: string) {
     onChange([...value, id]);
@@ -23,6 +25,20 @@ export default function OrderedImagePicker({
 
   function removeAt(index: number) {
     onChange(value.filter((_, i) => i !== index));
+  }
+
+  function handleDrop(dropIndex: number) {
+    if (dragIndex === null || dragIndex === dropIndex) {
+      setDragIndex(null);
+      setOverIndex(null);
+      return;
+    }
+    const next = [...value];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(dropIndex, 0, moved);
+    onChange(next);
+    setDragIndex(null);
+    setOverIndex(null);
   }
 
   return (
@@ -40,10 +56,23 @@ export default function OrderedImagePicker({
                 borderRadius: 8,
                 padding: 4,
                 cursor: "pointer",
-                background: "#fff"
+                background: "#fff",
+                textAlign: "left"
               }}
             >
               <img src={img.url} alt={img.filename} style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 4 }} />
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  marginTop: 4,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {img.filename}
+              </div>
             </button>
           ))}
         </div>
@@ -53,7 +82,7 @@ export default function OrderedImagePicker({
       </div>
 
       <div>
-        <div className="label">현재 재생 순서 ({value.length}장)</div>
+        <div className="label">현재 재생 순서 ({value.length}장) — 드래그해서 순서를 바꿀 수 있습니다</div>
         {value.length === 0 ? (
           <div style={{ color: "var(--muted)", fontSize: 13 }}>아직 추가된 이미지가 없습니다. 위에서 이미지를 클릭해 추가하세요.</div>
         ) : (
@@ -63,16 +92,31 @@ export default function OrderedImagePicker({
               return (
                 <div
                   key={`${id}-${index}`}
+                  draggable
+                  onDragStart={() => setDragIndex(index)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (overIndex !== index) setOverIndex(index);
+                  }}
+                  onDragLeave={() => setOverIndex((cur) => (cur === index ? null : cur))}
+                  onDrop={() => handleDrop(index)}
+                  onDragEnd={() => {
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    border: "1px solid var(--line)",
+                    border: overIndex === index ? "1px solid var(--accent)" : "1px solid var(--line)",
+                    background: dragIndex === index ? "#f3f4f6" : "#fff",
                     borderRadius: 8,
-                    padding: "6px 10px"
+                    padding: "6px 10px",
+                    cursor: "grab"
                   }}
                 >
-                  <div style={{ fontSize: 12, color: "var(--muted)", width: 22 }}>{index + 1}</div>
+                  <span style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1 }}>⠿</span>
+                  <div style={{ fontSize: 12, color: "var(--muted)", width: 20 }}>{index + 1}</div>
                   {img && <img src={img.url} alt={img.filename} style={{ width: 44, height: 30, objectFit: "cover", borderRadius: 4 }} />}
                   <div style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {img?.filename ?? "(삭제된 이미지)"}

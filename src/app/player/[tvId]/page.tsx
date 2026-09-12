@@ -171,10 +171,10 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
       {group.length === 2 ? (
         <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "100vh" }}>
           <div style={{ width: "100vw", height: "50vh", borderBottom: "1px solid #222" }}>
-            <AlarmView alarm={group[0]} settings={alarmSettings} font={activeFont} compact />
+            <AlarmView alarm={group[0]} settings={alarmSettings} font={activeFont} />
           </div>
           <div style={{ width: "100vw", height: "50vh" }}>
-            <AlarmView alarm={group[1]} settings={alarmSettings} font={activeFont} compact />
+            <AlarmView alarm={group[1]} settings={alarmSettings} font={activeFont} />
           </div>
         </div>
       ) : (
@@ -268,16 +268,13 @@ function ImageLoopView({
 function AlarmView({
   alarm,
   settings,
-  font,
-  compact
+  font
 }: {
   alarm: AlarmRow;
   settings: AlarmSettingsRow;
   font?: FontRow;
-  compact?: boolean;
 }) {
   const fontFamily = font ? `alarm-font-${font.id}` : "inherit";
-  const scale = compact ? 0.55 : 1;
 
   const lines = renderAlarmLines(settings.template, {
     program_name: alarm.program_name,
@@ -298,14 +295,15 @@ function AlarmView({
         justifyContent: "center",
         gap: 16,
         textAlign: "center",
-        padding: "0 24px"
+        padding: "0 24px",
+        overflow: "hidden"
       }}
     >
       {font && <style>{`@font-face { font-family: '${fontFamily}'; src: url('${font.url}'); }`}</style>}
       {lines.map((text, i) => {
         const size = settings.line_font_sizes[i] ?? settings.line_font_sizes[settings.line_font_sizes.length - 1] ?? 28;
         return (
-          <div key={i} style={{ fontFamily, fontSize: Math.max(10, Math.round(size * scale)), fontWeight: i === 0 ? 700 : 500, lineHeight: 1.4 }}>
+          <div key={i} style={{ fontFamily, fontSize: size, fontWeight: i === 0 ? 700 : 500, lineHeight: 1.4 }}>
             {text}
           </div>
         );

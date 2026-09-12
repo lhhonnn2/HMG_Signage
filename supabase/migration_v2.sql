@@ -64,4 +64,12 @@ alter table alarms drop column if exists line_font_sizes;
 
 create index if not exists alarms_tv_date_idx on alarms (tv_id, alarm_date);
 
-alter publication supabase_realtime add table alarm_settings;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'alarm_settings'
+  ) then
+    alter publication supabase_realtime add table alarm_settings;
+  end if;
+end $$;

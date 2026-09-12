@@ -56,4 +56,12 @@ begin
   end if;
 end $$;
 
-alter publication supabase_realtime add table tv_playlists;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'tv_playlists'
+  ) then
+    alter publication supabase_realtime add table tv_playlists;
+  end if;
+end $$;
