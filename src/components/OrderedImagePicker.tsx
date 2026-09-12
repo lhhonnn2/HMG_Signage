@@ -87,25 +87,25 @@ export default function OrderedImagePicker({
                     border: overIndex === index ? "1px solid var(--accent)" : "1px solid var(--line)",
                     background: dragIndex === index ? "#f3f4f6" : "#fff",
                     borderRadius: 8,
-                    padding: "6px 10px",
+                    padding: "4px 8px",
                     cursor: "grab"
                   }}
                 >
-                  <span style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1 }}>⠿</span>
-                  <div style={{ fontSize: 12, color: "var(--muted)", width: 20 }}>{index + 1}</div>
+                  <span style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1 }}>⠿</span>
+                  <div style={{ fontSize: 10.5, color: "var(--muted)", width: 16 }}>{index + 1}</div>
                   {img && (
                     <img
                       src={img.thumbnail_url || img.url}
                       alt={img.filename}
                       loading="lazy"
                       decoding="async"
-                      style={{ width: 44, height: 30, objectFit: "cover", borderRadius: 4 }}
+                      style={{ width: 36, height: 24, objectFit: "cover", borderRadius: 3 }}
                     />
                   )}
-                  <div style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {img?.filename ?? "(삭제된 이미지)"}
                   </div>
-                  <button className="btn btn-danger" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => removeAt(index)}>
+                  <button className="btn btn-danger" style={{ padding: "3px 8px", fontSize: 11 }} onClick={() => removeAt(index)}>
                     제외
                   </button>
                 </div>
@@ -127,7 +127,7 @@ const ImageGrid = memo(function ImageGrid({ images, onAdd }: { images: ImageRow[
     return <div style={{ color: "var(--muted)", fontSize: 13 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>;
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 6 }}>
       {images.map((img) => (
         <button
           key={img.id}
@@ -147,7 +147,7 @@ const ImageGrid = memo(function ImageGrid({ images, onAdd }: { images: ImageRow[
             alt={img.filename}
             loading="lazy"
             decoding="async"
-            style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 4 }}
+            style={{ width: "100%", height: 46, objectFit: "cover", borderRadius: 4 }}
           />
           <div
             style={{

@@ -55,7 +55,7 @@ create table if not exists tv_playlists (
 create table if not exists scheduled_image_sets (
   id uuid primary key default gen_random_uuid(),
   tv_id smallint references tvs(id) on delete cascade,
-  weekday smallint not null check (weekday between 0 and 6), -- 0=Sun .. 6=Sat
+  weekdays smallint[] not null default '{}', -- 0=Sun..6=Sat, can list several days (e.g. {0,6} for Sat+Sun) so one entry covers all of them
   start_time time not null,
   end_time time not null,
   image_ids uuid[] not null default '{}'

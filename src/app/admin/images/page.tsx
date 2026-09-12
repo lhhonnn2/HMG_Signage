@@ -95,23 +95,23 @@ export default function ImagesPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-          gap: 12
+          gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+          gap: 8
         }}
       >
         {images.map((img) => (
-          <div key={img.id} className="card" style={{ padding: 8 }}>
+          <div key={img.id} className="card" style={{ padding: 6 }}>
             <img
               src={img.thumbnail_url || img.url}
               alt={img.filename}
               loading="lazy"
               decoding="async"
-              style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6 }}
+              style={{ width: "100%", height: 66, objectFit: "cover", borderRadius: 5 }}
             />
-            <div style={{ fontSize: 12, marginTop: 6, wordBreak: "break-all" }}>{img.filename}</div>
+            <div style={{ fontSize: 10.5, marginTop: 4, wordBreak: "break-all" }}>{img.filename}</div>
             <button
               className="btn btn-outline"
-              style={{ marginTop: 6, width: "100%", fontSize: 12 }}
+              style={{ marginTop: 4, width: "100%", fontSize: 11, padding: "4px 8px" }}
               onClick={() => remove(img.id)}
             >
               삭제

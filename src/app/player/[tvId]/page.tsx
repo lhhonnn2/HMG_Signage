@@ -15,7 +15,6 @@ import type {
 } from "@/lib/types";
 
 const ROTATE_EVERY_MS = 5000; // how long each pair/leftover of overlapping alarms shows before rotating
-const TRANSITION_MS = 700;
 
 function todayStr() {
   const d = new Date();
@@ -54,7 +53,6 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const [settings, setSettings] = useState<TvSettingsRow>({
     tv_id: tvId,
     interval_seconds: 5,
-    transition_effect: "cut",
     alarm_duration_seconds: 30
   });
   const [audio, setAudio] = useState<TvAudioRow | null>(null);
@@ -123,7 +121,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     const base = playlist.map((p) => imageMap.get(p.image_id)).filter(Boolean) as ImageRow[];
     const weekday = now.getDay();
     const extra = scheduledSets
-      .filter((s) => s.weekday === weekday && timeInWindow(now, s.start_time, s.end_time))
+      .filter((s) => s.weekdays.includes(weekday) && timeInWindow(now, s.start_time, s.end_time))
       .flatMap((s) => s.image_ids.map((id) => imageMap.get(id)).filter(Boolean) as ImageRow[]);
     return [...base, ...extra];
   }, [playlist, scheduledSets, imageMap, now]);
@@ -149,7 +147,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   if (activeAlarms.length === 0) {
     return (
       <FullBleed>
-        <ImageLoopView images={currentLoopImages} intervalSeconds={settings.interval_seconds} transition={settings.transition_effect} />
+        <ImageLoopView images={currentLoopImages} intervalSeconds={settings.interval_seconds} />
       </FullBleed>
     );
   }
@@ -189,80 +187,41 @@ function FullBleed({ children }: { children: React.ReactNode }) {
   return <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", margin: 0 }}>{children}</div>;
 }
 
-function ImageLoopView({
-  images,
-  intervalSeconds,
-  transition
-}: {
-  images: ImageRow[];
-  intervalSeconds: number;
-  transition: "cut" | "fade" | "slide";
-}) {
+function ImageLoopView({ images, intervalSeconds }: { images: ImageRow[]; intervalSeconds: number }) {
   const [index, setIndex] = useState(0);
-  const [prevIndex, setPrevIndex] = useState<number | null>(null);
-  const [entered, setEntered] = useState(false);
+  const idKey = images.map((i) => i.id).join(",");
+
+  // Preload every image in the current loop up front so the browser
+  // already has each one cached by the time we swap to it — without this,
+  // swapping <img src> to an unfetched URL leaves a blank/black instant
+  // while it loads, which is what was showing up as a flash between images.
+  useEffect(() => {
+    const preloaded = images.map((img) => {
+      const el = new window.Image();
+      el.src = img.url;
+      return el;
+    });
+    return () => {
+      preloaded.length = 0;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idKey]);
 
   useEffect(() => {
     setIndex(0);
-    setPrevIndex(null);
-  }, [images.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idKey]);
 
   useEffect(() => {
     if (images.length <= 1) return;
     const ms = Math.max(1, intervalSeconds) * 1000;
-    const t = setInterval(() => {
-      setIndex((i) => {
-        setPrevIndex(i);
-        return (i + 1) % images.length;
-      });
-    }, ms);
+    const t = setInterval(() => setIndex((i) => (i + 1) % images.length), ms);
     return () => clearInterval(t);
   }, [images.length, intervalSeconds]);
 
-  useEffect(() => {
-    if (prevIndex === null) return;
-    setEntered(false);
-    const raf = requestAnimationFrame(() => setEntered(true));
-    const timeout = setTimeout(() => setPrevIndex(null), TRANSITION_MS);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timeout);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index]);
-
   if (images.length === 0) return null;
   const current = images[index % images.length];
-  const prev = prevIndex !== null ? images[prevIndex % images.length] : null;
-
-  if (transition === "cut" || !prev) {
-    return <img src={current.url} style={{ width: "100vw", height: "100vh", objectFit: "cover" }} alt="" />;
-  }
-
-  const baseImgStyle: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    width: "100%",
-    height: "100%",
-    objectFit: "cover"
-  };
-
-  const prevStyle: React.CSSProperties =
-    transition === "fade"
-      ? { ...baseImgStyle, opacity: entered ? 0 : 1, transition: `opacity ${TRANSITION_MS}ms ease` }
-      : { ...baseImgStyle, transform: entered ? "translateX(-100%)" : "translateX(0)", transition: `transform ${TRANSITION_MS}ms ease` };
-
-  const currentStyle: React.CSSProperties =
-    transition === "fade"
-      ? { ...baseImgStyle, opacity: entered ? 1 : 0, transition: `opacity ${TRANSITION_MS}ms ease` }
-      : { ...baseImgStyle, transform: entered ? "translateX(0)" : "translateX(100%)", transition: `transform ${TRANSITION_MS}ms ease` };
-
-  return (
-    <div style={{ position: "relative", width: "100vw", height: "100vh", overflow: "hidden" }}>
-      <img src={prev.url} style={prevStyle} alt="" />
-      <img src={current.url} style={currentStyle} alt="" />
-    </div>
-  );
+  return <img src={current.url} style={{ width: "100vw", height: "100vh", objectFit: "cover" }} alt="" />;
 }
 
 function AlarmView({

@@ -23,12 +23,9 @@ export type FontRow = {
   url: string;
 };
 
-export type TransitionEffect = "cut" | "fade" | "slide";
-
 export type TvSettingsRow = {
   tv_id: number;
   interval_seconds: number;
-  transition_effect: TransitionEffect;
   alarm_duration_seconds: number;
 };
 
@@ -42,7 +39,7 @@ export type TvPlaylistRow = {
 export type ScheduledImageSetRow = {
   id: string;
   tv_id: number;
-  weekday: number; // 0=Sun ... 6=Sat
+  weekdays: number[]; // 0=Sun ... 6=Sat, can be several days at once
   start_time: string; // HH:MM:SS
   end_time: string; // HH:MM:SS
   image_ids: string[];
