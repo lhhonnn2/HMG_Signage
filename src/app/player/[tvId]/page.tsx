@@ -2,8 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  renderAlarmLines,
+  DEFAULT_TEMPLATE
+} from "@/lib/types";
 import type {
   AlarmRow,
+  AlarmSettingsRow,
   FontRow,
   ImageRow,
   ScheduledImageSetRow,
@@ -20,7 +25,7 @@ function todayStr() {
 }
 
 function alarmStart(a: AlarmRow) {
-  return new Date(`${a.alarm_date}T${a.start_time}`);
+  return new Date(`${a.alarm_date}T${a.alarm_time}`);
 }
 
 function isAlarmActive(a: AlarmRow, now: Date) {
@@ -45,21 +50,28 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const [settings, setSettings] = useState<TvSettingsRow>({ tv_id: tvId, interval_seconds: 5 });
   const [audio, setAudio] = useState<TvAudioRow | null>(null);
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
+  const [alarmSettings, setAlarmSettings] = useState<AlarmSettingsRow>({
+    id: 1,
+    font_id: null,
+    line_font_sizes: [40, 28, 28, 24],
+    duration_seconds: 30,
+    template: DEFAULT_TEMPLATE
+  });
   const [fonts, setFonts] = useState<FontRow[]>([]);
   const [now, setNow] = useState(new Date());
   const [imgIndex, setImgIndex] = useState(0);
   const [rotateIndex, setRotateIndex] = useState(0);
 
-  // --- data loading ---
   async function loadData() {
-    const [imgsRes, playlistRes, setsRes, settingsRes, audioRes, fontsRes, alarmsRes] = await Promise.all([
+    const [imgsRes, playlistRes, setsRes, settingsRes, audioRes, fontsRes, alarmsRes, alarmSettingsRes] = await Promise.all([
       supabase.from("images").select("*"),
       supabase.from("tv_playlists").select("*").eq("tv_id", tvId).order("sort_order"),
       supabase.from("scheduled_image_sets").select("*").eq("tv_id", tvId),
       supabase.from("tv_settings").select("*").eq("tv_id", tvId).maybeSingle(),
       supabase.from("tv_audio").select("*").eq("tv_id", tvId).maybeSingle(),
       supabase.from("fonts").select("*"),
-      supabase.from("alarms").select("*").eq("alarm_date", todayStr()).contains("tv_ids", [tvId])
+      supabase.from("alarms").select("*").eq("alarm_date", todayStr()).eq("tv_id", tvId),
+      supabase.from("alarm_settings").select("*").eq("id", 1).maybeSingle()
     ]);
 
     setImages(imgsRes.data || []);
@@ -69,6 +81,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     setAudio((audioRes.data as TvAudioRow) || null);
     setFonts(fontsRes.data || []);
     setAlarms((alarmsRes.data as AlarmRow[]) || []);
+    if (alarmSettingsRes.data) setAlarmSettings(alarmSettingsRes.data as AlarmSettingsRow);
   }
 
   useEffect(() => {
@@ -82,6 +95,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "scheduled_image_sets" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "tv_settings" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "tv_audio" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "alarm_settings" }, loadData)
       .subscribe();
 
     return () => {
@@ -91,13 +105,11 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tvId]);
 
-  // --- clock tick ---
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // --- which images should be looping right now (base playlist + matching scheduled sets) ---
   const imageMap = useMemo(() => new Map(images.map((i) => [i.id, i])), [images]);
 
   const currentLoopImages = useMemo(() => {
@@ -112,7 +124,6 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     return merged.filter((img) => (seen.has(img.id) ? false : (seen.add(img.id), true)));
   }, [playlist, scheduledSets, imageMap, now]);
 
-  // --- image loop advance ---
   useEffect(() => {
     if (currentLoopImages.length === 0) return;
     const ms = Math.max(1, settings.interval_seconds) * 1000;
@@ -126,7 +137,6 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     setImgIndex(0);
   }, [currentLoopImages.length]);
 
-  // --- active alarms for this instant ---
   const activeAlarms = useMemo(() => alarms.filter((a) => isAlarmActive(a, now)), [alarms, now]);
 
   useEffect(() => {
@@ -141,19 +151,13 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   }, [activeAlarms.length]);
 
   const shouldPlayAudio = activeAlarms.length > 0 && !!audio?.audio_enabled && !!audio?.audio_url;
+  const activeFont = fonts.find((f) => f.id === alarmSettings.font_id);
 
-  // --- render ---
   if (activeAlarms.length === 0) {
     const img = currentLoopImages[imgIndex % Math.max(1, currentLoopImages.length)];
     return (
       <FullBleed>
-        {img ? (
-          <img
-            src={img.url}
-            style={{ width: "100vw", height: "100vh", objectFit: "cover" }}
-            alt=""
-          />
-        ) : null}
+        {img ? <img src={img.url} style={{ width: "100vw", height: "100vh", objectFit: "cover" }} alt="" /> : null}
       </FullBleed>
     );
   }
@@ -161,7 +165,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   if (activeAlarms.length === 1) {
     return (
       <FullBleed>
-        <AlarmView alarm={activeAlarms[0]} font={fonts.find((f) => f.id === activeAlarms[0].font_id)} />
+        <AlarmView alarm={activeAlarms[0]} settings={alarmSettings} font={activeFont} />
         {shouldPlayAudio && <LoopAudio src={audio!.audio_url!} />}
       </FullBleed>
     );
@@ -172,10 +176,10 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
       <FullBleed>
         <div style={{ display: "flex", width: "100vw", height: "100vh" }}>
           <div style={{ width: "50vw", height: "100vh", borderRight: "1px solid #222" }}>
-            <AlarmView alarm={activeAlarms[0]} font={fonts.find((f) => f.id === activeAlarms[0].font_id)} compact />
+            <AlarmView alarm={activeAlarms[0]} settings={alarmSettings} font={activeFont} compact />
           </div>
           <div style={{ width: "50vw", height: "100vh" }}>
-            <AlarmView alarm={activeAlarms[1]} font={fonts.find((f) => f.id === activeAlarms[1].font_id)} compact />
+            <AlarmView alarm={activeAlarms[1]} settings={alarmSettings} font={activeFont} compact />
           </div>
         </div>
         {shouldPlayAudio && <LoopAudio src={audio!.audio_url!} />}
@@ -183,37 +187,38 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     );
   }
 
-  // 3 or more: rotate one full-screen alarm at a time
   const current = activeAlarms[rotateIndex % activeAlarms.length];
   return (
     <FullBleed>
-      <AlarmView alarm={current} font={fonts.find((f) => f.id === current.font_id)} />
+      <AlarmView alarm={current} settings={alarmSettings} font={activeFont} />
       {shouldPlayAudio && <LoopAudio src={audio!.audio_url!} />}
     </FullBleed>
   );
 }
 
 function FullBleed({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", margin: 0 }}>
-      {children}
-    </div>
-  );
+  return <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", margin: 0 }}>{children}</div>;
 }
 
-function AlarmView({ alarm, font, compact }: { alarm: AlarmRow; font?: FontRow; compact?: boolean }) {
+function AlarmView({
+  alarm,
+  settings,
+  font,
+  compact
+}: {
+  alarm: AlarmRow;
+  settings: AlarmSettingsRow;
+  font?: FontRow;
+  compact?: boolean;
+}) {
   const fontFamily = font ? `alarm-font-${font.id}` : "inherit";
   const scale = compact ? 0.55 : 1;
-  const sizes = alarm.line_font_sizes;
-  const startLabel = alarm.start_time.slice(0, 5);
 
-  const lines = [
-    "ANNOUNCEMENT",
-    `알람은 ${alarm.program_name},${alarm.location}에서 시작됩니다.`,
-    "해당 장소 앞으로 이동해주세요.",
-    `시작 시간 : ${startLabel}`
-  ];
-  const lineSizes = [sizes.line1, sizes.line2, sizes.line3, sizes.line4];
+  const lines = renderAlarmLines(settings.template, {
+    program_name: alarm.program_name,
+    location: alarm.location,
+    scheduled_time: alarm.scheduled_time.slice(0, 5)
+  });
 
   return (
     <div
@@ -231,22 +236,23 @@ function AlarmView({ alarm, font, compact }: { alarm: AlarmRow; font?: FontRow; 
         padding: "0 24px"
       }}
     >
-      {font && (
-        <style>{`@font-face { font-family: '${fontFamily}'; src: url('${font.url}'); }`}</style>
-      )}
-      {lines.map((text, i) => (
-        <div
-          key={i}
-          style={{
-            fontFamily,
-            fontSize: Math.max(10, Math.round(lineSizes[i] * scale)),
-            fontWeight: i === 0 ? 700 : 500,
-            lineHeight: 1.4
-          }}
-        >
-          {text}
-        </div>
-      ))}
+      {font && <style>{`@font-face { font-family: '${fontFamily}'; src: url('${font.url}'); }`}</style>}
+      {lines.map((text, i) => {
+        const size = settings.line_font_sizes[i] ?? settings.line_font_sizes[settings.line_font_sizes.length - 1] ?? 28;
+        return (
+          <div
+            key={i}
+            style={{
+              fontFamily,
+              fontSize: Math.max(10, Math.round(size * scale)),
+              fontWeight: i === 0 ? 700 : 500,
+              lineHeight: 1.4
+            }}
+          >
+            {text}
+          </div>
+        );
+      })}
     </div>
   );
 }

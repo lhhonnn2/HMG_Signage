@@ -47,7 +47,8 @@ export default function FontsPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>폰트</h1>
+      <div className="page-title">폰트</div>
+      <div className="page-subtitle">알람 화면에서 쓸 폰트 파일을 업로드합니다. 실제 사용은 "알람 서식 설정"에서 지정합니다.</div>
 
       <div className="card" style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 10 }}>
         <div>

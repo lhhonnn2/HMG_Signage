@@ -42,7 +42,8 @@ export default function ImagesPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>이미지</h1>
+      <div className="page-title">이미지</div>
+      <div className="page-subtitle">여기서 올린 이미지를 TV 설정, 이미지 템플릿, 요일별 추가 이미지에서 사용할 수 있습니다.</div>
 
       <div className="card" style={{ marginBottom: 20 }}>
         <label className="label">이미지 업로드 (여러 장 선택 가능)</label>

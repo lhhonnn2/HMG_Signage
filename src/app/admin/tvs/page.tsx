@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
-import type { ImageRow, TvAudioRow, TvSettingsRow } from "@/lib/types";
-
-const TV_IDS = [1, 2, 3, 4, 5];
+import type { ImageRow, ImageTemplateRow, TvAudioRow, TvSettingsRow } from "@/lib/types";
+import { TV_IDS } from "@/lib/types";
 
 export default function TvsPage() {
   const [activeTv, setActiveTv] = useState(1);
   const [images, setImages] = useState<ImageRow[]>([]);
+  const [templates, setTemplates] = useState<ImageTemplateRow[]>([]);
+  const [templateChoice, setTemplateChoice] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [interval, setIntervalSec] = useState(5);
   const [audio, setAudio] = useState<TvAudioRow>({ tv_id: activeTv, audio_url: null, audio_enabled: false });
@@ -20,6 +21,9 @@ export default function TvsPage() {
     const { data: imgs } = await supabase.from("images").select("*").order("created_at", { ascending: false });
     setImages(imgs || []);
 
+    const { data: tpls } = await supabase.from("image_templates").select("*").order("name");
+    setTemplates(tpls || []);
+
     const { data: playlist } = await supabase
       .from("tv_playlists")
       .select("image_id, sort_order")
@@ -27,18 +31,10 @@ export default function TvsPage() {
       .order("sort_order");
     setSelectedIds((playlist || []).map((p) => p.image_id));
 
-    const { data: settings } = await supabase
-      .from("tv_settings")
-      .select("*")
-      .eq("tv_id", activeTv)
-      .maybeSingle();
+    const { data: settings } = await supabase.from("tv_settings").select("*").eq("tv_id", activeTv).maybeSingle();
     setIntervalSec((settings as TvSettingsRow | null)?.interval_seconds ?? 5);
 
-    const { data: audioRow } = await supabase
-      .from("tv_audio")
-      .select("*")
-      .eq("tv_id", activeTv)
-      .maybeSingle();
+    const { data: audioRow } = await supabase.from("tv_audio").select("*").eq("tv_id", activeTv).maybeSingle();
     setAudio((audioRow as TvAudioRow | null) ?? { tv_id: activeTv, audio_url: null, audio_enabled: false });
   }
 
@@ -51,6 +47,13 @@ export default function TvsPage() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  function applyTemplate() {
+    const t = templates.find((x) => x.id === templateChoice);
+    if (!t) return;
+    setSelectedIds((prev) => Array.from(new Set([...prev, ...t.image_ids])));
+    setTemplateChoice("");
+  }
+
   async function save() {
     setSaving(true);
     try {
@@ -58,9 +61,7 @@ export default function TvsPage() {
 
       await supabase.from("tv_playlists").delete().eq("tv_id", activeTv);
       if (selectedIds.length > 0) {
-        await supabase.from("tv_playlists").insert(
-          selectedIds.map((image_id, i) => ({ tv_id: activeTv, image_id, sort_order: i }))
-        );
+        await supabase.from("tv_playlists").insert(selectedIds.map((image_id, i) => ({ tv_id: activeTv, image_id, sort_order: i })));
       }
 
       await supabase.from("tv_audio").upsert({
@@ -84,18 +85,18 @@ export default function TvsPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>TV 설정</h1>
+      <div className="page-title">TV 설정</div>
+      <div className="page-subtitle">TV별로 재생목록, 전환 속도, 알람 음원을 따로 설정합니다.</div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
         {TV_IDS.map((id) => (
-          <button
-            key={id}
-            className={activeTv === id ? "btn" : "btn btn-outline"}
-            onClick={() => setActiveTv(id)}
-          >
+          <button key={id} className="chip" data-active={activeTv === id} onClick={() => setActiveTv(id)}>
             TV {id}
           </button>
         ))}
+        <a className="chip" href={`/player/${activeTv}`} target="_blank" rel="noreferrer" style={{ marginLeft: "auto" }}>
+          TV {activeTv} 화면 미리보기 ↗
+        </a>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -125,50 +126,59 @@ export default function TvsPage() {
           음원 업로드
         </button>
         {audio.audio_url && (
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 8, wordBreak: "break-all" }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8, wordBreak: "break-all" }}>
             현재 설정된 파일: {audio.audio_url}
           </div>
         )}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>재생목록 (선택한 이미지가 이 TV에서 루핑됩니다)</div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-            gap: 10
-          }}
-        >
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>재생목록 (선택한 이미지가 이 TV에서 루핑됩니다)</div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
+          <select className="input" style={{ width: 220 }} value={templateChoice} onChange={(e) => setTemplateChoice(e.target.value)}>
+            <option value="">템플릿에서 추가...</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.image_ids.length}장)
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-outline" disabled={!templateChoice} onClick={applyTemplate}>
+            추가
+          </button>
+          {selectedIds.length > 0 && (
+            <button className="btn btn-outline" onClick={() => setSelectedIds([])} style={{ marginLeft: "auto" }}>
+              전체 해제
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
           {images.map((img) => {
             const checked = selectedIds.includes(img.id);
             return (
               <label
                 key={img.id}
                 style={{
-                  border: checked ? "2px solid #2f6fed" : "1px solid #dfe2e8",
+                  border: checked ? "2px solid var(--accent)" : "1px solid var(--line)",
                   borderRadius: 8,
                   padding: 6,
                   cursor: "pointer"
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleImage(img.id)}
-                  style={{ marginBottom: 4 }}
-                />
+                <input type="checkbox" checked={checked} onChange={() => toggleImage(img.id)} style={{ marginBottom: 4 }} />
                 <img src={img.url} alt={img.filename} style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }} />
               </label>
             );
           })}
         </div>
         {images.length === 0 && (
-          <div style={{ color: "#6b7280", fontSize: 14 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>
+          <div style={{ color: "var(--muted)", fontSize: 14 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>
         )}
       </div>
 
-      <button className="btn" disabled={saving} onClick={save}>
+      <button className="btn btn-accent" disabled={saving} onClick={save}>
         {saving ? "저장 중..." : "저장"}
       </button>
     </div>

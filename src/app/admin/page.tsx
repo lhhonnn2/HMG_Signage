@@ -1,30 +1,27 @@
 import Link from "next/link";
 
+const CARDS = [
+  { href: "/admin/images", title: "이미지 업로드", desc: "이미지를 올리고 라이브러리에 등록합니다" },
+  { href: "/admin/image-templates", title: "이미지 템플릿", desc: "자주 쓰는 이미지 묶음을 만들어두고 TV 재생목록에 한 번에 적용" },
+  { href: "/admin/tvs", title: "TV별 설정", desc: "TV 1~5 재생목록, 전환속도, 알람 음원" },
+  { href: "/admin/schedules", title: "요일별 추가 이미지", desc: "특정 요일·시간대에만 함께 루핑될 이미지 세트" },
+  { href: "/admin/alarms", title: "알람 스케줄", desc: "TV별 알람 표, 직접 입력 또는 엑셀 업로드" },
+  { href: "/admin/settings", title: "알람 서식 설정", desc: "알람 문구 템플릿, 줄별 글자 크기, 폰트, 기본 노출시간" },
+  { href: "/admin/fonts", title: "폰트 관리", desc: "알람 화면에 쓸 폰트 파일 업로드" }
+];
+
 export default function AdminHome() {
   return (
     <div>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>대시보드</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <Link href="/admin/images" className="card" style={{ textDecoration: "none", color: "inherit" }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>이미지 업로드</div>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>이미지를 올리고 라이브러리에 등록합니다</div>
-        </Link>
-        <Link href="/admin/tvs" className="card" style={{ textDecoration: "none", color: "inherit" }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>TV별 설정</div>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>TV 1~5 재생목록, 전환속도, 알람 음원</div>
-        </Link>
-        <Link href="/admin/schedules" className="card" style={{ textDecoration: "none", color: "inherit" }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>요일별 추가 이미지</div>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>특정 요일·시간대에만 함께 루핑될 이미지 세트</div>
-        </Link>
-        <Link href="/admin/alarms" className="card" style={{ textDecoration: "none", color: "inherit" }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>알람 스케줄</div>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>알람 등록, 엑셀 업로드, 폰트/글자크기</div>
-        </Link>
-        <Link href="/admin/fonts" className="card" style={{ textDecoration: "none", color: "inherit" }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>폰트 관리</div>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>알람 화면에 쓸 폰트 파일 업로드</div>
-        </Link>
+      <div className="page-title">대시보드</div>
+      <div className="page-subtitle">필요한 항목을 선택해 설정을 관리하세요.</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        {CARDS.map((c) => (
+          <Link key={c.href} href={c.href} className="card" style={{ textDecoration: "none", color: "inherit" }}>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14.5 }}>{c.title}</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>{c.desc}</div>
+          </Link>
+        ))}
       </div>
     </div>
   );

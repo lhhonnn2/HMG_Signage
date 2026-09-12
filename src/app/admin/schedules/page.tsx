@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ImageRow, ScheduledImageSetRow } from "@/lib/types";
-import { WEEKDAY_LABELS } from "@/lib/types";
-
-const TV_IDS = [1, 2, 3, 4, 5];
+import { WEEKDAY_LABELS, TV_IDS } from "@/lib/types";
 
 export default function SchedulesPage() {
   const [rows, setRows] = useState<ScheduledImageSetRow[]>([]);
@@ -55,10 +53,8 @@ export default function SchedulesPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>요일별 추가 이미지</h1>
-      <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 20 }}>
-        지정한 요일·시간대 동안 선택한 이미지가 해당 TV의 기본 재생목록에 추가되어 함께 루핑됩니다.
-      </p>
+      <div className="page-title">요일별 추가 이미지</div>
+      <div className="page-subtitle">지정한 요일·시간대 동안 선택한 이미지가 해당 TV의 기본 재생목록에 추가되어 함께 루핑됩니다.</div>
 
       <div className="card" style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
