@@ -102,7 +102,7 @@ export default function AlarmSettingsPage() {
       <div className="page-title">알람 서식 설정</div>
       <div className="page-subtitle">모든 TV의 알람 화면에 공통으로 적용되는 문구, 줄별 글자 크기, 폰트입니다.</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+      <div className="responsive-grid-2" style={{ alignItems: "start" }}>
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
             <label className="label">알람 문구 템플릿</label>

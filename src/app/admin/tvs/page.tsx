@@ -101,7 +101,7 @@ export default function TvsPage() {
       <div className="page-title">TV 설정</div>
       <div className="page-subtitle">TV별로 이름, 재생목록, 전환 속도, 알람 음원을 따로 설정합니다.</div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {TV_IDS.map((id) => (
           <button key={id} className="chip" data-active={activeTv === id} onClick={() => setActiveTv(id)}>
             {tvNames[id]}

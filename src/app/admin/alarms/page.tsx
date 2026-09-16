@@ -204,7 +204,7 @@ export default function AlarmsPage() {
       <div className="page-title">알람 스케줄</div>
       <div className="page-subtitle">TV별로 완전히 독립된 알람 목록입니다. 날짜 탭을 선택해서 편집하세요.</div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
         {TV_IDS.map((id) => (
           <button key={id} className="chip" data-active={activeTv === id} onClick={() => setActiveTv(id)}>
             {tvNames[id]}
@@ -220,7 +220,7 @@ export default function AlarmsPage() {
         <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
           이 TV의 모든 알람에 공통으로 적용됩니다. 알람마다 따로 설정하지 않습니다.
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input className="input" type="number" style={{ width: 100 }} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
           <span style={{ fontSize: 13, color: "var(--muted)" }}>초</span>
           <button className="btn btn-outline" disabled={savingDuration} onClick={saveDuration}>
@@ -248,7 +248,7 @@ export default function AlarmsPage() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 600, marginBottom: 10 }}>새 날짜에 알람 추가</div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input className="input" type="date" style={{ width: 180 }} value={newDate} onChange={(e) => setNewDate(e.target.value)} />
           <button className="btn btn-accent" disabled={adding} onClick={() => addRow(newDate)}>
             {adding ? "추가 중..." : "+ 이 날짜로 알람 추가"}

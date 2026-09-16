@@ -14,7 +14,7 @@ export default function AdminHome() {
     <div>
       <div className="page-title">대시보드</div>
       <div className="page-subtitle">필요한 항목을 선택해 설정을 관리하세요.</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div className="responsive-grid-2" style={{ gap: 14 }}>
         {CARDS.map((c) => (
           <Link key={c.href} href={c.href} className="card" style={{ textDecoration: "none", color: "inherit" }}>
             <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14.5 }}>{c.title}</div>
