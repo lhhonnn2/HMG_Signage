@@ -53,7 +53,8 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const [settings, setSettings] = useState<TvSettingsRow>({
     tv_id: tvId,
     interval_seconds: 5,
-    alarm_duration_seconds: 30
+    alarm_duration_seconds: 30,
+    frequency_groups: []
   });
   const [audio, setAudio] = useState<TvAudioRow | null>(null);
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
@@ -126,6 +127,19 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     return [...base, ...extra];
   }, [playlist, scheduledSets, imageMap, now]);
 
+  // Frequency groups: each group contributes exactly one image per full
+  // loop lap (rotating through the group's list), appended after the base
+  // images. Which image that is for the *current* lap is decided inside
+  // ImageLoopView (it tracks the lap count) — here we just resolve each
+  // group's image ids to full ImageRow objects.
+  const frequencyGroupImages = useMemo(
+    () =>
+      (settings.frequency_groups || [])
+        .map((g) => g.image_ids.map((id) => imageMap.get(id)).filter(Boolean) as ImageRow[])
+        .filter((g) => g.length > 0),
+    [settings.frequency_groups, imageMap]
+  );
+
   const activeAlarms = useMemo(
     () => alarms.filter((a) => isAlarmActive(a, now, settings.alarm_duration_seconds)),
     [alarms, now, settings.alarm_duration_seconds]
@@ -147,7 +161,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   if (activeAlarms.length === 0) {
     return (
       <FullBleed>
-        <ImageLoopView images={currentLoopImages} intervalSeconds={settings.interval_seconds} />
+        <ImageLoopView images={currentLoopImages} groups={frequencyGroupImages} intervalSeconds={settings.interval_seconds} />
       </FullBleed>
     );
   }
@@ -271,16 +285,35 @@ function FullscreenButton() {
   );
 }
 
-function ImageLoopView({ images, intervalSeconds }: { images: ImageRow[]; intervalSeconds: number }) {
+function ImageLoopView({
+  images,
+  groups,
+  intervalSeconds
+}: {
+  images: ImageRow[];
+  groups: ImageRow[][];
+  intervalSeconds: number;
+}) {
   const [index, setIndex] = useState(0);
+  const [lap, setLap] = useState(0);
   const idKey = images.map((i) => i.id).join(",");
+  const groupsKey = groups.map((g) => g.map((i) => i.id).join(",")).join("|");
 
-  // Preload every image in the current loop up front so the browser
+  // Each frequency group contributes exactly one image for this lap,
+  // rotating to the next one every time a full lap completes.
+  const fullList = useMemo(() => {
+    const picks = groups.filter((g) => g.length > 0).map((g) => g[lap % g.length]);
+    return [...images, ...picks];
+  }, [images, groups, lap]);
+
+  const fullListKey = fullList.map((i) => i.id).join(",");
+
+  // Preload every image that could appear this lap up front so the browser
   // already has each one cached by the time we swap to it — without this,
   // swapping <img src> to an unfetched URL leaves a blank/black instant
   // while it loads, which is what was showing up as a flash between images.
   useEffect(() => {
-    const preloaded = images.map((img) => {
+    const preloaded = fullList.map((img) => {
       const el = new window.Image();
       el.src = img.url;
       return el;
@@ -289,22 +322,30 @@ function ImageLoopView({ images, intervalSeconds }: { images: ImageRow[]; interv
       preloaded.length = 0;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idKey]);
+  }, [fullListKey]);
 
   useEffect(() => {
     setIndex(0);
+    setLap(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idKey]);
+  }, [idKey, groupsKey]);
 
   useEffect(() => {
-    if (images.length <= 1) return;
+    if (fullList.length <= 1) return;
     const ms = Math.max(1, intervalSeconds) * 1000;
-    const t = setInterval(() => setIndex((i) => (i + 1) % images.length), ms);
+    const t = setInterval(() => {
+      setIndex((i) => {
+        const next = (i + 1) % fullList.length;
+        if (next === 0) setLap((l) => l + 1);
+        return next;
+      });
+    }, ms);
     return () => clearInterval(t);
-  }, [images.length, intervalSeconds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullList.length, intervalSeconds]);
 
-  if (images.length === 0) return null;
-  const current = images[index % images.length];
+  if (fullList.length === 0) return null;
+  const current = fullList[index % fullList.length];
   return <img src={current.url} style={{ width: "100vw", height: "100vh", objectFit: "cover" }} alt="" />;
 }
 

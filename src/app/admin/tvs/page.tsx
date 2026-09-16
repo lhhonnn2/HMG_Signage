@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
-import type { ImageRow, ImageTemplateRow, TvAudioRow, TvSettingsRow } from "@/lib/types";
+import type { FrequencyGroup, ImageRow, ImageTemplateRow, TvAudioRow, TvSettingsRow } from "@/lib/types";
 import { TV_IDS } from "@/lib/types";
 import { useTvNames } from "@/lib/useTvNames";
 import OrderedImagePicker from "@/components/OrderedImagePicker";
+import FrequencyGroupsEditor from "@/components/FrequencyGroupsEditor";
 
 export default function TvsPage() {
   const [activeTv, setActiveTv] = useState(1);
@@ -16,6 +17,7 @@ export default function TvsPage() {
   const [templates, setTemplates] = useState<ImageTemplateRow[]>([]);
   const [templateChoice, setTemplateChoice] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [frequencyGroups, setFrequencyGroups] = useState<FrequencyGroup[]>([]);
   const [interval, setIntervalSec] = useState(5);
   const [audio, setAudio] = useState<TvAudioRow>({ tv_id: activeTv, audio_url: null, audio_enabled: false });
   const [saving, setSaving] = useState(false);
@@ -33,7 +35,9 @@ export default function TvsPage() {
     setSelectedIds((playlist || []).map((p) => p.image_id));
 
     const { data: settings } = await supabase.from("tv_settings").select("*").eq("tv_id", activeTv).maybeSingle();
-    setIntervalSec((settings as TvSettingsRow | null)?.interval_seconds ?? 5);
+    const s = settings as TvSettingsRow | null;
+    setIntervalSec(s?.interval_seconds ?? 5);
+    setFrequencyGroups(s?.frequency_groups ?? []);
 
     const { data: audioRow } = await supabase.from("tv_audio").select("*").eq("tv_id", activeTv).maybeSingle();
     setAudio((audioRow as TvAudioRow | null) ?? { tv_id: activeTv, audio_url: null, audio_enabled: false });
@@ -49,7 +53,7 @@ export default function TvsPage() {
       .from("image_templates")
       .select("*")
       .order("name")
-      .then(({ data }) => setTemplates(data || []));
+      .then(({ data }) => setTemplates((data as ImageTemplateRow[]) || []));
   }, []);
 
   useEffect(() => {
@@ -61,6 +65,7 @@ export default function TvsPage() {
     const t = templates.find((x) => x.id === templateChoice);
     if (!t) return;
     setSelectedIds((prev) => [...prev, ...t.image_ids]);
+    setFrequencyGroups((prev) => [...prev, ...(t.frequency_groups || [])]);
     setTemplateChoice("");
   }
 
@@ -68,7 +73,11 @@ export default function TvsPage() {
     setSaving(true);
     try {
       await supabase.from("tvs").update({ name: tvName.trim() || `TV ${activeTv}` }).eq("id", activeTv);
-      await supabase.from("tv_settings").upsert({ tv_id: activeTv, interval_seconds: interval });
+      await supabase.from("tv_settings").upsert({
+        tv_id: activeTv,
+        interval_seconds: interval,
+        frequency_groups: frequencyGroups.filter((g) => g.image_ids.length > 0)
+      });
 
       await supabase.from("tv_playlists").delete().eq("tv_id", activeTv);
       if (selectedIds.length > 0) {
@@ -160,12 +169,12 @@ export default function TvsPage() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 14 }}>재생목록</div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
           <select className="input" style={{ width: 220 }} value={templateChoice} onChange={(e) => setTemplateChoice(e.target.value)}>
             <option value="">템플릿에서 추가...</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} ({t.image_ids.length}장)
+                {t.name} ({t.image_ids.length}장{t.frequency_groups?.length ? ` + 빈도그룹 ${t.frequency_groups.length}개` : ""})
               </option>
             ))}
           </select>
@@ -180,6 +189,10 @@ export default function TvsPage() {
         </div>
 
         <OrderedImagePicker images={images} value={selectedIds} onChange={setSelectedIds} />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <FrequencyGroupsEditor images={images} groups={frequencyGroups} onChange={setFrequencyGroups} />
       </div>
 
       <button className="btn btn-accent" disabled={saving} onClick={save}>

@@ -26,7 +26,8 @@ create table if not exists images (
 create table if not exists image_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  image_ids uuid[] not null default '{}'
+  image_ids uuid[] not null default '{}',
+  frequency_groups jsonb not null default '[]' -- same shape as tv_settings.frequency_groups; merged into the TV's groups when the template is applied
 );
 
 create table if not exists fonts (
@@ -38,9 +39,8 @@ create table if not exists fonts (
 create table if not exists tv_settings (
   tv_id smallint primary key references tvs(id) on delete cascade,
   interval_seconds int not null default 5,           -- 이미지 전환 간격(초)
-  transition_effect text not null default 'cut',      -- 'cut' | 'fade' | 'slide'
   alarm_duration_seconds int not null default 30,      -- 이 TV의 모든 알람에 일괄 적용되는 노출 시간(초)
-  check (transition_effect in ('cut', 'fade', 'slide'))
+  frequency_groups jsonb not null default '[]'         -- [{"image_ids":["...","..."]}, ...] 한 바퀴마다 그룹당 1장씩 번갈아 재생목록 끝에 추가됨
 );
 
 -- Ordered playlist; the same image can appear more than once (sort_order

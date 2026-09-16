@@ -11,10 +11,15 @@ export type TvRow = {
   name: string;
 };
 
+export type FrequencyGroup = {
+  image_ids: string[]; // rotates one image per full loop lap
+};
+
 export type ImageTemplateRow = {
   id: string;
   name: string;
   image_ids: string[]; // ordered, may contain duplicates
+  frequency_groups: FrequencyGroup[];
 };
 
 export type FontRow = {
@@ -27,6 +32,7 @@ export type TvSettingsRow = {
   tv_id: number;
   interval_seconds: number;
   alarm_duration_seconds: number;
+  frequency_groups: FrequencyGroup[];
 };
 
 export type TvPlaylistRow = {

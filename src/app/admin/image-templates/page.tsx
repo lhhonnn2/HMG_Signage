@@ -2,21 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import type { ImageRow, ImageTemplateRow } from "@/lib/types";
+import type { FrequencyGroup, ImageRow, ImageTemplateRow } from "@/lib/types";
 import OrderedImagePicker from "@/components/OrderedImagePicker";
+import FrequencyGroupsEditor from "@/components/FrequencyGroupsEditor";
 
 export default function ImageTemplatesPage() {
   const [images, setImages] = useState<ImageRow[]>([]);
   const [templates, setTemplates] = useState<ImageTemplateRow[]>([]);
   const [name, setName] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [frequencyGroups, setFrequencyGroups] = useState<FrequencyGroup[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   async function load() {
     const { data: imgs } = await supabase.from("images").select("*").order("created_at", { ascending: false });
     setImages(imgs || []);
     const { data: tpls } = await supabase.from("image_templates").select("*").order("name");
-    setTemplates(tpls || []);
+    setTemplates((tpls as ImageTemplateRow[]) || []);
   }
 
   useEffect(() => {
@@ -27,12 +29,14 @@ export default function ImageTemplatesPage() {
     setEditingId(t.id);
     setName(t.name);
     setSelectedIds(t.image_ids);
+    setFrequencyGroups(t.frequency_groups || []);
   }
 
   function resetForm() {
     setEditingId(null);
     setName("");
     setSelectedIds([]);
+    setFrequencyGroups([]);
   }
 
   async function save() {
@@ -44,10 +48,15 @@ export default function ImageTemplatesPage() {
       alert("이미지를 1장 이상 선택해주세요");
       return;
     }
+    const payload = {
+      name: name.trim(),
+      image_ids: selectedIds,
+      frequency_groups: frequencyGroups.filter((g) => g.image_ids.length > 0)
+    };
     if (editingId) {
-      await supabase.from("image_templates").update({ name: name.trim(), image_ids: selectedIds }).eq("id", editingId);
+      await supabase.from("image_templates").update(payload).eq("id", editingId);
     } else {
-      await supabase.from("image_templates").insert({ name: name.trim(), image_ids: selectedIds });
+      await supabase.from("image_templates").insert(payload);
     }
     resetForm();
     await load();
@@ -64,7 +73,8 @@ export default function ImageTemplatesPage() {
     <div>
       <div className="page-title">이미지 템플릿</div>
       <div className="page-subtitle">
-        자주 함께 쓰는 이미지들을 묶어두면, TV 설정 화면에서 하나씩 고르지 않고 템플릿 이름만 선택해 한 번에 재생목록에 추가할 수 있습니다.
+        자주 함께 쓰는 이미지들을 묶어두면, TV 설정 화면에서 하나씩 고르지 않고 템플릿 이름만 선택해 한 번에 재생목록(빈도 그룹 포함)에 추가할
+        수 있습니다.
       </div>
 
       <div className="card" style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -74,6 +84,8 @@ export default function ImageTemplatesPage() {
         </div>
 
         <OrderedImagePicker images={images} value={selectedIds} onChange={setSelectedIds} />
+
+        <FrequencyGroupsEditor images={images} groups={frequencyGroups} onChange={setFrequencyGroups} />
 
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn btn-accent" onClick={save}>
@@ -92,7 +104,9 @@ export default function ImageTemplatesPage() {
           <div key={t.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: 14 }}>
               <div style={{ fontWeight: 600 }}>{t.name}</div>
-              <div style={{ fontSize: 12, color: "var(--muted)" }}>이미지 {t.image_ids.length}장</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                이미지 {t.image_ids.length}장{t.frequency_groups?.length ? ` · 빈도그룹 ${t.frequency_groups.length}개` : ""}
+              </div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button className="btn btn-outline" onClick={() => startEdit(t)}>
