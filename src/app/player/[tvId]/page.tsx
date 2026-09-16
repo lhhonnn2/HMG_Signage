@@ -7,10 +7,11 @@ import type {
   AlarmRow,
   AlarmSettingsRow,
   FontRow,
+  FrequencyGroup,
   ImageRow,
+  PlaylistEntry,
   ScheduledImageSetRow,
   TvAudioRow,
-  TvPlaylistRow,
   TvSettingsRow
 } from "@/lib/types";
 
@@ -48,12 +49,12 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const tvId = Number(params.tvId);
 
   const [images, setImages] = useState<ImageRow[]>([]);
-  const [playlist, setPlaylist] = useState<TvPlaylistRow[]>([]);
   const [scheduledSets, setScheduledSets] = useState<ScheduledImageSetRow[]>([]);
   const [settings, setSettings] = useState<TvSettingsRow>({
     tv_id: tvId,
     interval_seconds: 5,
     alarm_duration_seconds: 30,
+    playlist_entries: [],
     frequency_groups: []
   });
   const [audio, setAudio] = useState<TvAudioRow | null>(null);
@@ -69,9 +70,8 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const [rotateIndex, setRotateIndex] = useState(0);
 
   async function loadData() {
-    const [imgsRes, playlistRes, setsRes, settingsRes, audioRes, fontsRes, alarmsRes, alarmSettingsRes] = await Promise.all([
+    const [imgsRes, setsRes, settingsRes, audioRes, fontsRes, alarmsRes, alarmSettingsRes] = await Promise.all([
       supabase.from("images").select("*"),
-      supabase.from("tv_playlists").select("*").eq("tv_id", tvId).order("sort_order"),
       supabase.from("scheduled_image_sets").select("*").eq("tv_id", tvId),
       supabase.from("tv_settings").select("*").eq("tv_id", tvId).maybeSingle(),
       supabase.from("tv_audio").select("*").eq("tv_id", tvId).maybeSingle(),
@@ -81,7 +81,6 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     ]);
 
     setImages(imgsRes.data || []);
-    setPlaylist(playlistRes.data || []);
     setScheduledSets(setsRes.data || []);
     if (settingsRes.data) setSettings(settingsRes.data as TvSettingsRow);
     setAudio((audioRes.data as TvAudioRow) || null);
@@ -97,7 +96,6 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     const channel = supabase
       .channel(`tv-${tvId}-updates`)
       .on("postgres_changes", { event: "*", schema: "public", table: "alarms" }, loadData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "tv_playlists" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "scheduled_image_sets" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "tv_settings" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "tv_audio" }, loadData)
@@ -118,27 +116,12 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
 
   const imageMap = useMemo(() => new Map(images.map((i) => [i.id, i])), [images]);
 
-  const currentLoopImages = useMemo(() => {
-    const base = playlist.map((p) => imageMap.get(p.image_id)).filter(Boolean) as ImageRow[];
+  const scheduledExtraImages = useMemo(() => {
     const weekday = now.getDay();
-    const extra = scheduledSets
+    return scheduledSets
       .filter((s) => s.weekdays.includes(weekday) && timeInWindow(now, s.start_time, s.end_time))
       .flatMap((s) => s.image_ids.map((id) => imageMap.get(id)).filter(Boolean) as ImageRow[]);
-    return [...base, ...extra];
-  }, [playlist, scheduledSets, imageMap, now]);
-
-  // Frequency groups: each group contributes exactly one image per full
-  // loop lap (rotating through the group's list), appended after the base
-  // images. Which image that is for the *current* lap is decided inside
-  // ImageLoopView (it tracks the lap count) — here we just resolve each
-  // group's image ids to full ImageRow objects.
-  const frequencyGroupImages = useMemo(
-    () =>
-      (settings.frequency_groups || [])
-        .map((g) => g.image_ids.map((id) => imageMap.get(id)).filter(Boolean) as ImageRow[])
-        .filter((g) => g.length > 0),
-    [settings.frequency_groups, imageMap]
-  );
+  }, [scheduledSets, imageMap, now]);
 
   const activeAlarms = useMemo(
     () => alarms.filter((a) => isAlarmActive(a, now, settings.alarm_duration_seconds)),
@@ -161,7 +144,13 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   if (activeAlarms.length === 0) {
     return (
       <FullBleed>
-        <ImageLoopView images={currentLoopImages} groups={frequencyGroupImages} intervalSeconds={settings.interval_seconds} />
+        <ImageLoopView
+          entries={settings.playlist_entries}
+          groups={settings.frequency_groups}
+          extraImages={scheduledExtraImages}
+          imageMap={imageMap}
+          intervalSeconds={settings.interval_seconds}
+        />
       </FullBleed>
     );
   }
@@ -286,25 +275,41 @@ function FullscreenButton() {
 }
 
 function ImageLoopView({
-  images,
+  entries,
   groups,
+  extraImages,
+  imageMap,
   intervalSeconds
 }: {
-  images: ImageRow[];
-  groups: ImageRow[][];
+  entries: PlaylistEntry[];
+  groups: FrequencyGroup[];
+  extraImages: ImageRow[];
+  imageMap: Map<string, ImageRow>;
   intervalSeconds: number;
 }) {
   const [index, setIndex] = useState(0);
   const [lap, setLap] = useState(0);
-  const idKey = images.map((i) => i.id).join(",");
-  const groupsKey = groups.map((g) => g.map((i) => i.id).join(",")).join("|");
+  const groupMap = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
+  const entriesKey = entries.map((e) => (e.type === "image" ? `i:${e.image_id}` : `g:${e.group_id}`)).join(",");
+  const groupsKey = groups.map((g) => `${g.id}:${g.image_ids.join(".")}`).join("|");
+  const extraKey = extraImages.map((i) => i.id).join(",");
 
-  // Each frequency group contributes exactly one image for this lap,
-  // rotating to the next one every time a full lap completes.
+  // Resolve the ordered entry list to actual images for THIS lap — an
+  // "image" entry always resolves the same way, a "group" entry resolves
+  // to whichever image is that group's current lap pick. Extra images from
+  // day/time schedules are appended after the main list, same as before.
   const fullList = useMemo(() => {
-    const picks = groups.filter((g) => g.length > 0).map((g) => g[lap % g.length]);
-    return [...images, ...picks];
-  }, [images, groups, lap]);
+    const resolved = entries
+      .map((e) => {
+        if (e.type === "image") return imageMap.get(e.image_id);
+        const g = groupMap.get(e.group_id);
+        if (!g || g.image_ids.length === 0) return undefined;
+        return imageMap.get(g.image_ids[lap % g.image_ids.length]);
+      })
+      .filter(Boolean) as ImageRow[];
+    return [...resolved, ...extraImages];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entriesKey, groupMap, imageMap, lap, extraKey]);
 
   const fullListKey = fullList.map((i) => i.id).join(",");
 
@@ -328,7 +333,7 @@ function ImageLoopView({
     setIndex(0);
     setLap(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idKey, groupsKey]);
+  }, [entriesKey, groupsKey, extraKey]);
 
   useEffect(() => {
     if (fullList.length <= 1) return;

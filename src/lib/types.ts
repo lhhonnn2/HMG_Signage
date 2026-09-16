@@ -11,14 +11,23 @@ export type TvRow = {
   name: string;
 };
 
+// A frequency group is defined separately from where it sits in a
+// playlist — its `id` is referenced by a PlaylistEntry of type "group" so
+// it can be dragged around and positioned anywhere in the list, just like
+// a single image.
 export type FrequencyGroup = {
+  id: string;
   image_ids: string[]; // rotates one image per full loop lap
 };
+
+export type PlaylistImageEntry = { id: string; type: "image"; image_id: string };
+export type PlaylistGroupEntry = { id: string; type: "group"; group_id: string };
+export type PlaylistEntry = PlaylistImageEntry | PlaylistGroupEntry;
 
 export type ImageTemplateRow = {
   id: string;
   name: string;
-  image_ids: string[]; // ordered, may contain duplicates
+  entries: PlaylistEntry[];
   frequency_groups: FrequencyGroup[];
 };
 
@@ -32,14 +41,8 @@ export type TvSettingsRow = {
   tv_id: number;
   interval_seconds: number;
   alarm_duration_seconds: number;
+  playlist_entries: PlaylistEntry[];
   frequency_groups: FrequencyGroup[];
-};
-
-export type TvPlaylistRow = {
-  id: string;
-  tv_id: number;
-  image_id: string;
-  sort_order: number;
 };
 
 export type ScheduledImageSetRow = {
@@ -92,4 +95,10 @@ export function renderAlarmLines(
       .replaceAll("[장소]", vars.location)
       .replaceAll("[시작시간]", vars.scheduled_time)
   );
+}
+
+// Small random id for client-generated entries/groups (not a DB primary
+// key — just needs to be unique within one playlist/template).
+export function newLocalId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }

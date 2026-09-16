@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ImageRow } from "@/lib/types";
+import ImageGrid from "@/components/ImageGrid";
 
 // Click a thumbnail in the grid to append it to `value` (duplicates allowed).
 // The list underneath shows the actual playback order — drag rows to
@@ -19,10 +20,6 @@ export default function OrderedImagePicker({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
-  // Reads `value` via a ref instead of a closure dependency so this
-  // callback's identity stays stable across renders — that's what lets
-  // ImageGrid below stay memoized (and skip re-rendering) while the order
-  // list underneath re-renders constantly during a drag.
   const valueRef = useRef(value);
   valueRef.current = value;
   const add = useCallback(
@@ -53,12 +50,12 @@ export default function OrderedImagePicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
-        <div className="label">이미지를 클릭하면 재생목록 맨 뒤에 추가됩니다 (같은 이미지 여러 번 추가 가능)</div>
+        <div className="label">이미지를 클릭하면 목록 맨 뒤에 추가됩니다 (같은 이미지 여러 번 추가 가능)</div>
         <ImageGrid images={images} onAdd={add} />
       </div>
 
       <div>
-        <div className="label">현재 재생 순서 ({value.length}장) — 드래그해서 순서를 바꿀 수 있습니다</div>
+        <div className="label">현재 순서 ({value.length}장) — 드래그해서 순서를 바꿀 수 있습니다</div>
         {value.length === 0 ? (
           <div style={{ color: "var(--muted)", fontSize: 13 }}>아직 추가된 이미지가 없습니다. 위에서 이미지를 클릭해 추가하세요.</div>
         ) : (
@@ -117,52 +114,3 @@ export default function OrderedImagePicker({
     </div>
   );
 }
-
-// Memoized separately so it only re-renders when the image library itself
-// changes — not on every drag-over event from the order list above, which
-// otherwise re-renders (and re-downloads nothing, but re-lays-out) the
-// entire grid dozens of times per second while dragging.
-const ImageGrid = memo(function ImageGrid({ images, onAdd }: { images: ImageRow[]; onAdd: (id: string) => void }) {
-  if (images.length === 0) {
-    return <div style={{ color: "var(--muted)", fontSize: 13 }}>먼저 이미지 메뉴에서 이미지를 업로드해주세요.</div>;
-  }
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 6 }}>
-      {images.map((img) => (
-        <button
-          key={img.id}
-          type="button"
-          onClick={() => onAdd(img.id)}
-          style={{
-            border: "1px solid var(--line)",
-            borderRadius: 8,
-            padding: 4,
-            cursor: "pointer",
-            background: "#fff",
-            textAlign: "left"
-          }}
-        >
-          <img
-            src={img.thumbnail_url || img.url}
-            alt={img.filename}
-            loading="lazy"
-            decoding="async"
-            style={{ width: "100%", height: 46, objectFit: "cover", borderRadius: 4 }}
-          />
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--muted)",
-              marginTop: 4,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap"
-            }}
-          >
-            {img.filename}
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-});

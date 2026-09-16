@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
-import type { FrequencyGroup, ImageRow, ImageTemplateRow, TvAudioRow, TvSettingsRow } from "@/lib/types";
-import { TV_IDS } from "@/lib/types";
+import type { FrequencyGroup, ImageRow, ImageTemplateRow, PlaylistEntry, TvAudioRow, TvSettingsRow } from "@/lib/types";
+import { TV_IDS, newLocalId } from "@/lib/types";
 import { useTvNames } from "@/lib/useTvNames";
-import OrderedImagePicker from "@/components/OrderedImagePicker";
-import FrequencyGroupsEditor from "@/components/FrequencyGroupsEditor";
+import PlaylistEditor from "@/components/PlaylistEditor";
 
 export default function TvsPage() {
   const [activeTv, setActiveTv] = useState(1);
@@ -16,8 +15,8 @@ export default function TvsPage() {
   const [images, setImages] = useState<ImageRow[]>([]);
   const [templates, setTemplates] = useState<ImageTemplateRow[]>([]);
   const [templateChoice, setTemplateChoice] = useState("");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [frequencyGroups, setFrequencyGroups] = useState<FrequencyGroup[]>([]);
+  const [entries, setEntries] = useState<PlaylistEntry[]>([]);
+  const [groups, setGroups] = useState<FrequencyGroup[]>([]);
   const [interval, setIntervalSec] = useState(5);
   const [audio, setAudio] = useState<TvAudioRow>({ tv_id: activeTv, audio_url: null, audio_enabled: false });
   const [saving, setSaving] = useState(false);
@@ -27,17 +26,11 @@ export default function TvsPage() {
     const { data: tvRow } = await supabase.from("tvs").select("*").eq("id", activeTv).maybeSingle();
     setTvName((tvRow as any)?.name ?? `TV ${activeTv}`);
 
-    const { data: playlist } = await supabase
-      .from("tv_playlists")
-      .select("image_id, sort_order")
-      .eq("tv_id", activeTv)
-      .order("sort_order");
-    setSelectedIds((playlist || []).map((p) => p.image_id));
-
     const { data: settings } = await supabase.from("tv_settings").select("*").eq("tv_id", activeTv).maybeSingle();
     const s = settings as TvSettingsRow | null;
     setIntervalSec(s?.interval_seconds ?? 5);
-    setFrequencyGroups(s?.frequency_groups ?? []);
+    setEntries(s?.playlist_entries ?? []);
+    setGroups(s?.frequency_groups ?? []);
 
     const { data: audioRow } = await supabase.from("tv_audio").select("*").eq("tv_id", activeTv).maybeSingle();
     setAudio((audioRow as TvAudioRow | null) ?? { tv_id: activeTv, audio_url: null, audio_enabled: false });
@@ -64,8 +57,19 @@ export default function TvsPage() {
   function applyTemplate() {
     const t = templates.find((x) => x.id === templateChoice);
     if (!t) return;
-    setSelectedIds((prev) => [...prev, ...t.image_ids]);
-    setFrequencyGroups((prev) => [...prev, ...(t.frequency_groups || [])]);
+    // Give the template's groups fresh ids so applying the same template
+    // twice (or to multiple TVs) doesn't collide.
+    const idMap = new Map<string, string>();
+    const newGroups = (t.frequency_groups || []).map((g) => {
+      const newId = newLocalId();
+      idMap.set(g.id, newId);
+      return { id: newId, image_ids: g.image_ids };
+    });
+    const newEntries = (t.entries || []).map((e) =>
+      e.type === "group" ? { id: newLocalId(), type: "group" as const, group_id: idMap.get(e.group_id) ?? e.group_id } : { ...e, id: newLocalId() }
+    );
+    setEntries((prev) => [...prev, ...newEntries]);
+    setGroups((prev) => [...prev, ...newGroups]);
     setTemplateChoice("");
   }
 
@@ -76,15 +80,9 @@ export default function TvsPage() {
       await supabase.from("tv_settings").upsert({
         tv_id: activeTv,
         interval_seconds: interval,
-        frequency_groups: frequencyGroups.filter((g) => g.image_ids.length > 0)
+        playlist_entries: entries,
+        frequency_groups: groups.filter((g) => g.image_ids.length > 0)
       });
-
-      await supabase.from("tv_playlists").delete().eq("tv_id", activeTv);
-      if (selectedIds.length > 0) {
-        await supabase
-          .from("tv_playlists")
-          .insert(selectedIds.map((image_id, i) => ({ tv_id: activeTv, image_id, sort_order: i })));
-      }
 
       await supabase.from("tv_audio").upsert({
         tv_id: activeTv,
@@ -167,32 +165,43 @@ export default function TvsPage() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 14 }}>재생목록</div>
-
-        <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <select className="input" style={{ width: 220 }} value={templateChoice} onChange={(e) => setTemplateChoice(e.target.value)}>
-            <option value="">템플릿에서 추가...</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.image_ids.length}장{t.frequency_groups?.length ? ` + 빈도그룹 ${t.frequency_groups.length}개` : ""})
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-outline" disabled={!templateChoice} onClick={applyTemplate}>
-            뒤에 추가
-          </button>
-          {selectedIds.length > 0 && (
-            <button className="btn btn-outline" onClick={() => setSelectedIds([])} style={{ marginLeft: "auto" }}>
-              전체 비우기
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>재생목록</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select className="input" style={{ width: 220 }} value={templateChoice} onChange={(e) => setTemplateChoice(e.target.value)}>
+              <option value="">템플릿에서 추가...</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.entries?.length ?? 0}개)
+                </option>
+              ))}
+            </select>
+            <button className="btn btn-outline" disabled={!templateChoice} onClick={applyTemplate}>
+              뒤에 추가
             </button>
-          )}
+            {entries.length > 0 && (
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  setEntries([]);
+                  setGroups([]);
+                }}
+              >
+                전체 비우기
+              </button>
+            )}
+          </div>
         </div>
 
-        <OrderedImagePicker images={images} value={selectedIds} onChange={setSelectedIds} />
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <FrequencyGroupsEditor images={images} groups={frequencyGroups} onChange={setFrequencyGroups} />
+        <PlaylistEditor
+          images={images}
+          entries={entries}
+          groups={groups}
+          onChange={(e, g) => {
+            setEntries(e);
+            setGroups(g);
+          }}
+        />
       </div>
 
       <button className="btn btn-accent" disabled={saving} onClick={save}>

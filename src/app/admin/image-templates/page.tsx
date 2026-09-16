@@ -2,16 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import type { FrequencyGroup, ImageRow, ImageTemplateRow } from "@/lib/types";
-import OrderedImagePicker from "@/components/OrderedImagePicker";
-import FrequencyGroupsEditor from "@/components/FrequencyGroupsEditor";
+import type { FrequencyGroup, ImageRow, ImageTemplateRow, PlaylistEntry } from "@/lib/types";
+import PlaylistEditor from "@/components/PlaylistEditor";
 
 export default function ImageTemplatesPage() {
   const [images, setImages] = useState<ImageRow[]>([]);
   const [templates, setTemplates] = useState<ImageTemplateRow[]>([]);
   const [name, setName] = useState("");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [frequencyGroups, setFrequencyGroups] = useState<FrequencyGroup[]>([]);
+  const [entries, setEntries] = useState<PlaylistEntry[]>([]);
+  const [groups, setGroups] = useState<FrequencyGroup[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   async function load() {
@@ -28,15 +27,15 @@ export default function ImageTemplatesPage() {
   function startEdit(t: ImageTemplateRow) {
     setEditingId(t.id);
     setName(t.name);
-    setSelectedIds(t.image_ids);
-    setFrequencyGroups(t.frequency_groups || []);
+    setEntries(t.entries || []);
+    setGroups(t.frequency_groups || []);
   }
 
   function resetForm() {
     setEditingId(null);
     setName("");
-    setSelectedIds([]);
-    setFrequencyGroups([]);
+    setEntries([]);
+    setGroups([]);
   }
 
   async function save() {
@@ -44,14 +43,14 @@ export default function ImageTemplatesPage() {
       alert("템플릿 이름을 입력해주세요");
       return;
     }
-    if (selectedIds.length === 0) {
-      alert("이미지를 1장 이상 선택해주세요");
+    if (entries.length === 0) {
+      alert("이미지나 빈도 그룹을 1개 이상 추가해주세요");
       return;
     }
     const payload = {
       name: name.trim(),
-      image_ids: selectedIds,
-      frequency_groups: frequencyGroups.filter((g) => g.image_ids.length > 0)
+      entries,
+      frequency_groups: groups.filter((g) => g.image_ids.length > 0)
     };
     if (editingId) {
       await supabase.from("image_templates").update(payload).eq("id", editingId);
@@ -73,8 +72,8 @@ export default function ImageTemplatesPage() {
     <div>
       <div className="page-title">이미지 템플릿</div>
       <div className="page-subtitle">
-        자주 함께 쓰는 이미지들을 묶어두면, TV 설정 화면에서 하나씩 고르지 않고 템플릿 이름만 선택해 한 번에 재생목록(빈도 그룹 포함)에 추가할
-        수 있습니다.
+        자주 함께 쓰는 이미지(및 빈도 그룹)를 묶어두면, TV 설정 화면에서 하나씩 고르지 않고 템플릿 이름만 선택해 한 번에 재생목록에 추가할 수
+        있습니다.
       </div>
 
       <div className="card" style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -83,9 +82,15 @@ export default function ImageTemplatesPage() {
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 평일 오전 기본 세트" />
         </div>
 
-        <OrderedImagePicker images={images} value={selectedIds} onChange={setSelectedIds} />
-
-        <FrequencyGroupsEditor images={images} groups={frequencyGroups} onChange={setFrequencyGroups} />
+        <PlaylistEditor
+          images={images}
+          entries={entries}
+          groups={groups}
+          onChange={(e, g) => {
+            setEntries(e);
+            setGroups(g);
+          }}
+        />
 
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn btn-accent" onClick={save}>
@@ -105,7 +110,7 @@ export default function ImageTemplatesPage() {
             <div style={{ fontSize: 14 }}>
               <div style={{ fontWeight: 600 }}>{t.name}</div>
               <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                이미지 {t.image_ids.length}장{t.frequency_groups?.length ? ` · 빈도그룹 ${t.frequency_groups.length}개` : ""}
+                항목 {t.entries?.length ?? 0}개{t.frequency_groups?.length ? ` · 빈도그룹 ${t.frequency_groups.length}개` : ""}
               </div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>

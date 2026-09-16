@@ -21,13 +21,15 @@ create table if not exists images (
   created_at timestamptz not null default now()
 );
 
--- Reusable bundles of images ("자주 쓰는 이미지 묶음"). image_ids is ordered
--- and may contain the same image more than once (repeats are allowed).
+-- Reusable bundles of images ("자주 쓰는 이미지 묶음"). `entries` is the
+-- ordered list (images and/or frequency-group placeholders, mixed
+-- together); `frequency_groups` holds each referenced group's own image
+-- rotation, keyed by id. Same shape as tv_settings below.
 create table if not exists image_templates (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  image_ids uuid[] not null default '{}',
-  frequency_groups jsonb not null default '[]' -- same shape as tv_settings.frequency_groups; merged into the TV's groups when the template is applied
+  entries jsonb not null default '[]',
+  frequency_groups jsonb not null default '[]'
 );
 
 create table if not exists fonts (
@@ -40,16 +42,15 @@ create table if not exists tv_settings (
   tv_id smallint primary key references tvs(id) on delete cascade,
   interval_seconds int not null default 5,           -- 이미지 전환 간격(초)
   alarm_duration_seconds int not null default 30,      -- 이 TV의 모든 알람에 일괄 적용되는 노출 시간(초)
-  frequency_groups jsonb not null default '[]'         -- [{"image_ids":["...","..."]}, ...] 한 바퀴마다 그룹당 1장씩 번갈아 재생목록 끝에 추가됨
-);
-
--- Ordered playlist; the same image can appear more than once (sort_order
--- is the row's position, id lets a single image be listed several times).
-create table if not exists tv_playlists (
-  id uuid primary key default gen_random_uuid(),
-  tv_id smallint references tvs(id) on delete cascade,
-  image_id uuid references images(id) on delete cascade,
-  sort_order int not null default 0
+  -- Ordered playlist. Each entry is either an image
+  -- ({"id","type":"image","image_id"}) or a placeholder for a frequency
+  -- group ({"id","type":"group","group_id"}) — entries can be freely
+  -- reordered together, so a group's rotating slot can sit anywhere in
+  -- the list, not just at the end.
+  playlist_entries jsonb not null default '[]',
+  -- Frequency group definitions, referenced by id from playlist_entries.
+  -- Each group rotates through its image_ids, one per full loop lap.
+  frequency_groups jsonb not null default '[]'
 );
 
 create table if not exists scheduled_image_sets (
@@ -98,7 +99,6 @@ insert into alarm_settings (id) values (1) on conflict (id) do nothing;
 
 -- Enable realtime so player screens get pushed updates instead of only polling
 alter publication supabase_realtime add table alarms;
-alter publication supabase_realtime add table tv_playlists;
 alter publication supabase_realtime add table scheduled_image_sets;
 alter publication supabase_realtime add table tv_settings;
 alter publication supabase_realtime add table tv_audio;
@@ -119,7 +119,6 @@ alter table images enable row level security;
 alter table image_templates enable row level security;
 alter table fonts enable row level security;
 alter table tv_settings enable row level security;
-alter table tv_playlists enable row level security;
 alter table scheduled_image_sets enable row level security;
 alter table tv_audio enable row level security;
 alter table alarms enable row level security;
@@ -130,7 +129,6 @@ create policy "public rw images" on images for all using (true) with check (true
 create policy "public rw image_templates" on image_templates for all using (true) with check (true);
 create policy "public rw fonts" on fonts for all using (true) with check (true);
 create policy "public rw tv_settings" on tv_settings for all using (true) with check (true);
-create policy "public rw tv_playlists" on tv_playlists for all using (true) with check (true);
 create policy "public rw scheduled_image_sets" on scheduled_image_sets for all using (true) with check (true);
 create policy "public rw tv_audio" on tv_audio for all using (true) with check (true);
 create policy "public rw alarms" on alarms for all using (true) with check (true);
