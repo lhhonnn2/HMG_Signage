@@ -187,12 +187,61 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
 }
 
 function FullBleed({ children }: { children: React.ReactNode }) {
+  const cursorHidden = useAutoHideCursor();
   return (
-    <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", margin: 0, position: "relative" }}>
+    <div
+      style={{
+        width: "100vw",
+        height: "100vh",
+        background: "#000",
+        overflow: "hidden",
+        margin: 0,
+        position: "relative",
+        cursor: cursorHidden ? "none" : "default"
+      }}
+    >
       {children}
       <FullscreenButton />
     </div>
   );
+}
+
+// Hides the mouse cursor after a few seconds of no movement while
+// fullscreen — a touch/remote-only TV shouldn't have a stray cursor
+// sitting on screen. Reappears on any movement, hides again after a lull.
+function useAutoHideCursor(timeoutMs = 3000) {
+  const [hidden, setHidden] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    function onFsChange() {
+      setIsFullscreen(!!document.fullscreenElement);
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    if (!isFullscreen) {
+      setHidden(false);
+      return;
+    }
+    function wake() {
+      setHidden(false);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setHidden(true), timeoutMs);
+    }
+    wake();
+    window.addEventListener("mousemove", wake);
+    return () => {
+      window.removeEventListener("mousemove", wake);
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [isFullscreen, timeoutMs]);
+
+  return hidden;
 }
 
 // TVs running this in an embedded/kiosk browser usually have no keyboard,
