@@ -6,6 +6,7 @@ const CARDS = [
   { href: "/admin/tvs", title: "TV별 설정", desc: "TV 1~5 재생목록, 전환속도, 알람 음원" },
   { href: "/admin/schedules", title: "요일별 추가 이미지", desc: "특정 요일·시간대에만 함께 루핑될 이미지 세트" },
   { href: "/admin/alarms", title: "알람 스케줄", desc: "TV별·날짜별 알람 표, 직접 입력 또는 엑셀 업로드" },
+  { href: "/admin/day-plans", title: "플랜 관리", desc: "마스터 타임테이블을 한 번 올려두고 날짜에 바로 적용해 알람 자동 생성" },
   { href: "/admin/settings", title: "알람 서식 설정", desc: "알람 문구 템플릿, 줄별 글자 크기, 폰트 업로드, 실시간 미리보기" }
 ];
 

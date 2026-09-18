@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { renderAlarmLines, DEFAULT_TEMPLATE } from "@/lib/types";
+import { renderAlarmLines, DEFAULT_TEMPLATE, contrastTextColor } from "@/lib/types";
 import type {
   AlarmRow,
   AlarmSettingsRow,
@@ -63,6 +63,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
     id: 1,
     font_id: null,
     line_font_sizes: [40, 28, 28, 24],
+    background_color: "#000000",
     template: DEFAULT_TEMPLATE
   });
   const [fonts, setFonts] = useState<FontRow[]>([]);
@@ -413,6 +414,8 @@ function AlarmView({
   font?: FontRow;
 }) {
   const fontFamily = font ? `alarm-font-${font.id}` : "inherit";
+  const bg = settings.background_color || "#000000";
+  const textColor = contrastTextColor(bg);
 
   const lines = renderAlarmLines(settings.template, {
     program_name: alarm.program_name,
@@ -425,8 +428,8 @@ function AlarmView({
       style={{
         width: "100%",
         height: "100%",
-        background: "#000",
-        color: "#fff",
+        background: bg,
+        color: textColor,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

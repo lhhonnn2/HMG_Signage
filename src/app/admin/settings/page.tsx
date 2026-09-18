@@ -4,9 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
 import type { AlarmSettingsRow, FontRow } from "@/lib/types";
-import { DEFAULT_TEMPLATE, renderAlarmLines } from "@/lib/types";
+import { DEFAULT_TEMPLATE, renderAlarmLines, contrastTextColor } from "@/lib/types";
 
 const SAMPLE = { program_name: "오프로드 체험", location: "1번 트랙 앞", scheduled_time: "10:00" };
+const SAMPLE_2 = { program_name: "짐카나 체험", location: "2번 트랙 앞", scheduled_time: "10:05" };
+
+type PreviewMode = "landscape" | "portrait" | "split";
+
+const PREVIEW_MODES: { value: PreviewMode; label: string }[] = [
+  { value: "landscape", label: "가로 (16:9)" },
+  { value: "portrait", label: "세로 (565×1228)" },
+  { value: "split", label: "알람 2개 (2분할)" }
+];
 
 export default function AlarmSettingsPage() {
   const [fonts, setFonts] = useState<FontRow[]>([]);
@@ -17,7 +26,9 @@ export default function AlarmSettingsPage() {
 
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   const [sizes, setSizes] = useState<number[]>([40, 28, 28, 24]);
+  const [backgroundColor, setBackgroundColor] = useState("#000000");
   const [saving, setSaving] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("landscape");
 
   const lines = template.split("\n");
 
@@ -31,6 +42,7 @@ export default function AlarmSettingsPage() {
       setFontId(s.font_id || "");
       setTemplate(s.template);
       setSizes(s.line_font_sizes);
+      setBackgroundColor(s.background_color || "#000000");
     }
   }
 
@@ -58,7 +70,8 @@ export default function AlarmSettingsPage() {
         id: 1,
         font_id: fontId || null,
         template,
-        line_font_sizes: lines.map((_, i) => sizeFor(i))
+        line_font_sizes: lines.map((_, i) => sizeFor(i)),
+        background_color: backgroundColor
       });
       alert("저장되었습니다. 모든 TV의 알람 화면에 즉시 반영됩니다.");
     } finally {
@@ -94,13 +107,30 @@ export default function AlarmSettingsPage() {
   }
 
   const previewFont = fonts.find((f) => f.id === fontId);
-  const previewLines = renderAlarmLines(template, SAMPLE);
   const previewFamily = previewFont ? `preview-font-${previewFont.id}` : "inherit";
+  const textColor = contrastTextColor(backgroundColor);
+
+  // 0.42 approximates "this box's rendered height relative to a real TV
+  // screen (~1080-1230px tall)" so the preview's font size looks roughly
+  // like what actually shows up on screen.
+  const SCALE = 0.42;
+
+  function renderLines(vars: typeof SAMPLE, scale: number) {
+    return renderAlarmLines(template, vars).map((text, i) => {
+      const size = sizeFor(i);
+      const scaled = Math.max(6, Math.round(size * scale));
+      return (
+        <div key={i} style={{ fontFamily: previewFamily, fontSize: scaled, fontWeight: i === 0 ? 700 : 500, lineHeight: 1.4 }}>
+          {text}
+        </div>
+      );
+    });
+  }
 
   return (
     <div>
       <div className="page-title">알람 서식 설정</div>
-      <div className="page-subtitle">모든 TV의 알람 화면에 공통으로 적용되는 문구, 줄별 글자 크기, 폰트입니다.</div>
+      <div className="page-subtitle">모든 TV의 알람 화면에 공통으로 적용되는 문구, 줄별 글자 크기, 배경색, 폰트입니다.</div>
 
       <div className="responsive-grid-2" style={{ alignItems: "start" }}>
         <div>
@@ -145,6 +175,25 @@ export default function AlarmSettingsPage() {
                   />
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 10 }}>배경색</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input
+                type="color"
+                value={backgroundColor}
+                onChange={(e) => setBackgroundColor(e.target.value)}
+                style={{ width: 44, height: 34, padding: 2, border: "1px solid var(--line)", borderRadius: 6, cursor: "pointer" }}
+              />
+              <input
+                className="input"
+                style={{ width: 120 }}
+                value={backgroundColor}
+                onChange={(e) => setBackgroundColor(e.target.value)}
+              />
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>글자색은 배경 밝기에 맞춰 검정/흰색으로 자동 전환됩니다</span>
             </div>
           </div>
 
@@ -195,42 +244,105 @@ export default function AlarmSettingsPage() {
           <div className="label" style={{ marginBottom: 8 }}>
             실시간 미리보기 (예시 값 기준)
           </div>
+          <div className="chip-row" style={{ marginBottom: 10 }}>
+            {PREVIEW_MODES.map((m) => (
+              <button key={m.value} className="chip" data-active={previewMode === m.value} onClick={() => setPreviewMode(m.value)}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+
           {previewFont && <style>{`@font-face { font-family: '${previewFamily}'; src: url('${previewFont.url}'); }`}</style>}
-          <div
-            style={{
-              background: "#000",
-              color: "#fff",
-              borderRadius: 12,
-              aspectRatio: "16 / 9",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "1.2%",
-              textAlign: "center",
-              padding: "4%",
-              overflow: "hidden"
-            }}
-          >
-            {previewLines.map((text, i) => {
-              const size = sizeFor(i);
-              // scale down to fit the smaller preview box (full TV screen ≈ 1080px tall)
-              const scaled = Math.max(6, Math.round(size * 0.42));
-              return (
+
+          {previewMode === "landscape" && (
+            <div
+              style={{
+                background: backgroundColor,
+                color: textColor,
+                borderRadius: 12,
+                aspectRatio: "16 / 9",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "1.2%",
+                textAlign: "center",
+                padding: "4%",
+                overflow: "hidden"
+              }}
+            >
+              {renderLines(SAMPLE, SCALE)}
+            </div>
+          )}
+
+          {previewMode === "portrait" && (
+            <div
+              style={{
+                background: backgroundColor,
+                color: textColor,
+                borderRadius: 12,
+                aspectRatio: "565 / 1228",
+                maxHeight: 560,
+                margin: "0 auto",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "1.2%",
+                textAlign: "center",
+                padding: "5% 6%",
+                overflow: "hidden"
+              }}
+            >
+              {renderLines(SAMPLE, SCALE)}
+            </div>
+          )}
+
+          {previewMode === "split" && (
+            <div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
+                같은 시각에 알람이 2개 겹치면 화면이 이렇게 위/아래로 나뉘어 각각 표시됩니다 (글자 크기는 줄이지 않고 그대로 적용됩니다 —
+                칸이 좁아 넘칠 수 있다면 여기서 바로 확인하고 크기를 조절하세요).
+              </div>
+              <div style={{ borderRadius: 12, aspectRatio: "16 / 9", overflow: "hidden", display: "flex", flexDirection: "column" }}>
                 <div
-                  key={i}
                   style={{
-                    fontFamily: previewFamily,
-                    fontSize: scaled,
-                    fontWeight: i === 0 ? 700 : 500,
-                    lineHeight: 1.4
+                    flex: 1,
+                    background: backgroundColor,
+                    color: textColor,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "1.2%",
+                    textAlign: "center",
+                    padding: "2% 4%",
+                    overflow: "hidden",
+                    borderBottom: "1px solid rgba(128,128,128,0.4)"
                   }}
                 >
-                  {text}
+                  {renderLines(SAMPLE, SCALE)}
                 </div>
-              );
-            })}
-          </div>
+                <div
+                  style={{
+                    flex: 1,
+                    background: backgroundColor,
+                    color: textColor,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "1.2%",
+                    textAlign: "center",
+                    padding: "2% 4%",
+                    overflow: "hidden"
+                  }}
+                >
+                  {renderLines(SAMPLE_2, SCALE)}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

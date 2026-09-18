@@ -83,12 +83,22 @@ create table if not exists alarms (
 
 create index if not exists alarms_tv_date_idx on alarms (tv_id, alarm_date);
 
+-- A saved "day plan": one sheet from an uploaded master timetable,
+-- imported once and re-used from then on. Applying a plan to a date (for
+-- whichever TV is selected) generates one alarm row per item in `rows`.
+create table if not exists day_plans (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  rows jsonb not null default '[]' -- [{"program_name","location","start_time"}, ...]
+);
+
 -- Global alarm look & template — applies to every TV's alarm screen.
 -- Always exactly one row (id = 1).
 create table if not exists alarm_settings (
   id int primary key default 1,
   font_id uuid references fonts(id) on delete set null,
   line_font_sizes jsonb not null default '[40,28,28,24]', -- 템플릿 줄 순서대로 매칭되는 글자 크기(px) 배열
+  background_color text not null default '#000000',
   template text not null default 'ANNOUNCEMENT
 [프로그램명],[장소]에서 시작됩니다.
 해당 장소 앞으로 이동해주세요.
@@ -123,6 +133,7 @@ alter table scheduled_image_sets enable row level security;
 alter table tv_audio enable row level security;
 alter table alarms enable row level security;
 alter table alarm_settings enable row level security;
+alter table day_plans enable row level security;
 
 create policy "public read tvs" on tvs for select using (true);
 create policy "public rw images" on images for all using (true) with check (true);
@@ -133,3 +144,4 @@ create policy "public rw scheduled_image_sets" on scheduled_image_sets for all u
 create policy "public rw tv_audio" on tv_audio for all using (true) with check (true);
 create policy "public rw alarms" on alarms for all using (true) with check (true);
 create policy "public rw alarm_settings" on alarm_settings for all using (true) with check (true);
+create policy "public rw day_plans" on day_plans for all using (true) with check (true);

@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabaseClient";
-import type { AlarmRow, TvSettingsRow } from "@/lib/types";
+import type { AlarmRow, DayPlanRow, TvSettingsRow } from "@/lib/types";
 import { TV_IDS } from "@/lib/types";
 import { useTvNames } from "@/lib/useTvNames";
+import { normalizeDateCell, normalizeTimeCell, subtractMinutes } from "@/lib/excelParsing";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -16,48 +17,6 @@ function todayStr() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// Handles: real Date objects (when the source sheet has real date/time
-// formatting), "YYYY-MM-DD" / "H:MM[:SS]" strings, and raw Excel serial
-// numbers (what you get when a cell holds a date/time but isn't tagged as
-// one — this is what caused "invalid input syntax for type date: 46277").
-function normalizeDateCell(v: any): string {
-  if (v instanceof Date) {
-    return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
-  }
-  const s = String(v ?? "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  if (/^\d{4}[./]\d{1,2}[./]\d{1,2}$/.test(s)) {
-    const [y, m, d] = s.split(/[./]/).map(Number);
-    return `${y}-${pad(m)}-${pad(d)}`;
-  }
-  if (/^\d+(\.\d+)?$/.test(s)) {
-    const serial = Number(s);
-    const ms = Math.round((serial - 25569) * 86400 * 1000);
-    const d = new Date(ms);
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-  }
-  const parsed = new Date(s);
-  if (!Number.isNaN(parsed.getTime())) {
-    return `${parsed.getUTCFullYear()}-${pad(parsed.getUTCMonth() + 1)}-${pad(parsed.getUTCDate())}`;
-  }
-  return s;
-}
-
-function normalizeTimeCell(v: any): string {
-  if (v instanceof Date) {
-    return `${pad(v.getUTCHours())}:${pad(v.getUTCMinutes())}:${pad(v.getUTCSeconds())}`;
-  }
-  const s = String(v ?? "").trim();
-  if (/^\d{1,2}:\d{2}$/.test(s)) return `${s}:00`;
-  if (/^\d{1,2}:\d{2}:\d{2}$/.test(s)) return s;
-  const asNumber = Number(s);
-  if (!Number.isNaN(asNumber) && asNumber >= 0 && asNumber < 1) {
-    const totalSeconds = Math.round(asNumber * 24 * 60 * 60);
-    return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`;
-  }
-  return "09:00:00";
-}
-
 export default function AlarmsPage() {
   const [activeTv, setActiveTv] = useState(1);
   const tvNames = useTvNames();
@@ -66,6 +25,11 @@ export default function AlarmsPage() {
   const [duration, setDuration] = useState(30);
   const [savingDuration, setSavingDuration] = useState(false);
   const [newDate, setNewDate] = useState(todayStr());
+  const [plans, setPlans] = useState<DayPlanRow[]>([]);
+  const [planDate, setPlanDate] = useState(todayStr());
+  const [planChoice, setPlanChoice] = useState("");
+  const [planOffset, setPlanOffset] = useState(5);
+  const [applyingPlan, setApplyingPlan] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -96,6 +60,42 @@ export default function AlarmsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTv]);
+
+  useEffect(() => {
+    supabase
+      .from("day_plans")
+      .select("*")
+      .order("name")
+      .then(({ data }) => setPlans((data as DayPlanRow[]) || []));
+  }, []);
+
+  async function applyPlan() {
+    const plan = plans.find((p) => p.id === planChoice);
+    if (!plan) return;
+    if (plan.rows.length === 0) {
+      alert("이 플랜에 항목이 없습니다");
+      return;
+    }
+    setApplyingPlan(true);
+    try {
+      const toInsert = plan.rows.map((r) => ({
+        tv_id: activeTv,
+        alarm_date: planDate,
+        alarm_time: subtractMinutes(r.start_time, planOffset),
+        scheduled_time: r.start_time,
+        program_name: r.program_name,
+        location: r.location
+      }));
+      const { error } = await supabase.from("alarms").insert(toInsert);
+      if (error) throw error;
+      alert(`${tvNames[activeTv]} · ${planDate}에 "${plan.name}" 플랜 ${toInsert.length}건을 생성했습니다`);
+      await load(planDate);
+    } catch (e: any) {
+      alert("생성 중 오류: " + e.message);
+    } finally {
+      setApplyingPlan(false);
+    }
+  }
 
   function updateLocal(id: string, patch: Partial<AlarmRow>) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -157,7 +157,8 @@ export default function AlarmsPage() {
     setImporting(true);
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      // Deliberately NOT using cellDates:true here — see excelParsing.ts for why.
+      const wb = XLSX.read(buf, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const excelRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
@@ -244,6 +245,45 @@ export default function AlarmsPage() {
           엑셀 열: 날짜 · 알람시각 · 시작예정시각 · 프로그램명 · 렉처룸. 여러 날짜를 한 시트에 이어서 넣어도 올리고 나면 자동으로 날짜별 탭으로
           나뉩니다. TV와 글자 크기/폰트는 여기(현재 {tvNames[activeTv]})와 "알람 서식 설정"에서 각각 적용되므로 엑셀에는 넣지 않습니다.
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>플랜에서 일괄 생성</div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
+          "플랜 관리"에서 미리 등록해둔 하루치 타임테이블을 날짜에 바로 적용합니다. 엑셀을 매번 올릴 필요 없이 날짜·플랜만 고르면
+          됩니다.
+        </div>
+        {plans.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            등록된 플랜이 없습니다. <a href="/admin/day-plans">플랜 관리</a>에서 먼저 마스터 타임테이블을 업로드해주세요.
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input className="input" type="date" style={{ width: 160 }} value={planDate} onChange={(e) => setPlanDate(e.target.value)} />
+            <select className="input" style={{ width: 200 }} value={planChoice} onChange={(e) => setPlanChoice(e.target.value)}>
+              <option value="">플랜 선택...</option>
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.rows.length}개)
+                </option>
+              ))}
+            </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>알람 시차</span>
+              <input
+                className="input"
+                type="number"
+                style={{ width: 64 }}
+                value={planOffset}
+                onChange={(e) => setPlanOffset(Number(e.target.value))}
+              />
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>분 전</span>
+            </div>
+            <button className="btn btn-accent" disabled={!planChoice || applyingPlan} onClick={applyPlan}>
+              {applyingPlan ? "생성 중..." : "이 날짜에 적용"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
