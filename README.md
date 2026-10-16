@@ -75,10 +75,14 @@ https://your-app.vercel.app/player/5
 버전에 따라 필요한 파일만 순서대로 실행하면 됩니다 (이미 실행한 파일은 건너뛰어도 됩니다):
 
 - 처음 설치: `schema.sql`만 실행
-- `schema.sql`만 실행해본 경우: `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql` → `migration_v5.sql` → `migration_v6.sql` → `migration_v7.sql` → `migration_v8.sql` → `migration_v9.sql`
-- `migration_v8.sql`까지 실행한 경우: `migration_v9.sql`만
+- `schema.sql`만 실행해본 경우: `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql` → `migration_v5.sql` → `migration_v6.sql` → `migration_v7.sql` → `migration_v8.sql` → `migration_v9.sql` → `migration_v10.sql`
+- `migration_v9.sql`까지 실행한 경우: `migration_v10.sql`만 (TV 추가/삭제 기능, 1~5 제한 해제)
+- `migration_v8.sql`까지 실행한 경우: `migration_v9.sql` → `migration_v10.sql`
 
-## 최신 업데이트 (v10)
+## 최신 업데이트 (v11: TV 추가/삭제 — migration_v10.sql 실행 필요)
+- 관리자 > TV 설정에서 "+ TV 추가"로 TV를 늘리고, "이 TV 삭제"로 지울 수 있습니다 (삭제 시 해당 TV의 모든 설정·알람 함께 삭제).
+
+## 이전 업데이트 (v10)
 
 - **알람 배경색 지정**: "알람 서식 설정"에서 배경색을 검은색 외 원하는 색으로 바꿀 수 있습니다. 글자색은 배경 밝기에 맞춰 검정/흰색으로 자동 전환되어 항상 읽히도록 했습니다.
 - **세로 화면(565×1228) 미리보기**: 실시간 미리보기에 "가로(16:9)" 외에 세로형 화면 비율 미리보기가 추가됐습니다.
