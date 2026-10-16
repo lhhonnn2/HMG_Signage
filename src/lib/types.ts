@@ -85,7 +85,6 @@ export type AlarmSettingsRow = {
 };
 
 export const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
-export const TV_IDS = [1, 2, 3, 4, 5];
 
 export const DEFAULT_TEMPLATE = `ANNOUNCEMENT
 [프로그램명],[장소]에서 시작됩니다.

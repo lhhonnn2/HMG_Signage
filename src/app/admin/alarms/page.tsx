@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabaseClient";
 import type { AlarmRow, DayPlanRow, TvSettingsRow } from "@/lib/types";
-import { TV_IDS } from "@/lib/types";
-import { useTvNames } from "@/lib/useTvNames";
+import { useTvs } from "@/lib/useTvNames";
 import { normalizeDateCell, normalizeTimeCell, subtractMinutes } from "@/lib/excelParsing";
 
 function pad(n: number) {
@@ -19,7 +18,12 @@ function todayStr() {
 
 export default function AlarmsPage() {
   const [activeTv, setActiveTv] = useState(1);
-  const tvNames = useTvNames();
+  const { ids: tvIds, names: tvNames } = useTvs();
+  // Keep the selected TV valid when the TV list loads or a TV is deleted.
+  useEffect(() => {
+    if (tvIds.length > 0 && !tvIds.includes(activeTv)) setActiveTv(tvIds[0]);
+  }, [tvIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [rows, setRows] = useState<AlarmRow[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [duration, setDuration] = useState(30);
@@ -206,7 +210,7 @@ export default function AlarmsPage() {
       <div className="page-subtitle">TV별로 완전히 독립된 알람 목록입니다. 날짜 탭을 선택해서 편집하세요.</div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-        {TV_IDS.map((id) => (
+        {tvIds.map((id) => (
           <button key={id} className="chip" data-active={activeTv === id} onClick={() => setActiveTv(id)}>
             {tvNames[id]}
           </button>

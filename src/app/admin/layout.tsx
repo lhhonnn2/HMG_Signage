@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TV_IDS } from "@/lib/types";
-import { useTvNames } from "@/lib/useTvNames";
+import { useTvs } from "@/lib/useTvNames";
 
 const NAV = [
   { href: "/admin", label: "대시보드" },
@@ -19,7 +18,7 @@ const NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const tvNames = useTvNames();
+  const { ids: tvIds, names: tvNames } = useTvs();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Close the mobile menu automatically whenever you navigate to a new page.
@@ -60,7 +59,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           송출화면 바로가기
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "0 8px" }}>
-          {TV_IDS.map((id) => (
+          {tvIds.map((id) => (
             <a key={id} className="chip" href={`/player/${id}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, padding: "5px 10px" }}>
               {tvNames[id]} ↗
             </a>

@@ -4,13 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
 import type { FrequencyGroup, ImageRow, ImageTemplateRow, PlaylistEntry, TvAudioRow, TvSettingsRow } from "@/lib/types";
-import { TV_IDS, newLocalId } from "@/lib/types";
-import { useTvNames } from "@/lib/useTvNames";
+import { newLocalId } from "@/lib/types";
+import { useTvs, notifyTvsChanged } from "@/lib/useTvNames";
 import PlaylistEditor from "@/components/PlaylistEditor";
 
 export default function TvsPage() {
   const [activeTv, setActiveTv] = useState(1);
-  const tvNames = useTvNames();
+  const { ids: tvIds, names: tvNames, loaded: tvsLoaded } = useTvs();
+  // Keep the selected TV valid when the TV list loads or a TV is deleted.
+  useEffect(() => {
+    if (tvIds.length > 0 && !tvIds.includes(activeTv)) setActiveTv(tvIds[0]);
+  }, [tvIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [tvName, setTvName] = useState("");
   const [images, setImages] = useState<ImageRow[]>([]);
   const [templates, setTemplates] = useState<ImageTemplateRow[]>([]);
@@ -50,9 +55,10 @@ export default function TvsPage() {
   }, []);
 
   useEffect(() => {
+    if (!tvsLoaded || !tvIds.includes(activeTv)) return;
     loadTvSpecific();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTv]);
+  }, [activeTv, tvsLoaded, tvIds.join(",")]);
 
   function applyTemplate() {
     const t = templates.find((x) => x.id === templateChoice);
@@ -73,10 +79,33 @@ export default function TvsPage() {
     setTemplateChoice("");
   }
 
+  async function addTv() {
+    const nextId = (tvIds.length ? Math.max(...tvIds) : 0) + 1;
+    const { error } = await supabase.from("tvs").insert({ id: nextId, name: `TV ${nextId}` });
+    if (error) {
+      alert("TV 추가 실패: " + error.message + "\n(supabase/migration_v10.sql 을 실행했는지 확인하세요)");
+      return;
+    }
+    await supabase.from("tv_settings").upsert({ tv_id: nextId });
+    notifyTvsChanged();
+    setActiveTv(nextId);
+  }
+
+  async function deleteTv() {
+    if (!confirm(`'${tvNames[activeTv]}'을(를) 삭제할까요?\n이 TV의 재생목록, 알람 스케줄, 요일별 이미지, 음원 설정이 모두 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    const { error } = await supabase.from("tvs").delete().eq("id", activeTv);
+    if (error) {
+      alert("삭제 실패: " + error.message);
+      return;
+    }
+    notifyTvsChanged();
+  }
+
   async function save() {
     setSaving(true);
     try {
       await supabase.from("tvs").update({ name: tvName.trim() || `TV ${activeTv}` }).eq("id", activeTv);
+      notifyTvsChanged();
       await supabase.from("tv_settings").upsert({
         tv_id: activeTv,
         interval_seconds: interval,
@@ -109,15 +138,28 @@ export default function TvsPage() {
       <div className="page-subtitle">TV별로 이름, 재생목록, 전환 속도, 알람 음원을 따로 설정합니다.</div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-        {TV_IDS.map((id) => (
+        {tvIds.map((id) => (
           <button key={id} className="chip" data-active={activeTv === id} onClick={() => setActiveTv(id)}>
             {tvNames[id]}
           </button>
         ))}
-        <a className="chip" href={`/player/${activeTv}`} target="_blank" rel="noreferrer" style={{ marginLeft: "auto" }}>
-          {tvNames[activeTv]} 화면 미리보기 ↗
-        </a>
+        <button className="chip" onClick={addTv}>
+          + TV 추가
+        </button>
+        {tvIds.includes(activeTv) && (
+          <a className="chip" href={`/player/${activeTv}`} target="_blank" rel="noreferrer" style={{ marginLeft: "auto" }}>
+            {tvNames[activeTv]} 화면 미리보기 ↗
+          </a>
+        )}
       </div>
+
+      {tvsLoaded && tvIds.length === 0 && (
+        <div className="card" style={{ marginBottom: 16, fontSize: 13 }}>
+          등록된 TV가 없습니다. 위의 "+ TV 추가"를 눌러 TV를 만드세요.
+        </div>
+      )}
+      {tvIds.length > 0 && (
+      <>
 
       <div className="card" style={{ marginBottom: 12, display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div>
@@ -204,9 +246,16 @@ export default function TvsPage() {
         />
       </div>
 
-      <button className="btn btn-accent" disabled={saving} onClick={save}>
-        {saving ? "저장 중..." : "저장"}
-      </button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn btn-accent" disabled={saving} onClick={save}>
+          {saving ? "저장 중..." : "저장"}
+        </button>
+        <button className="btn btn-outline" style={{ color: "#dc2626", marginLeft: "auto" }} onClick={deleteTv}>
+          이 TV 삭제
+        </button>
+      </div>
+      </>
+      )}
     </div>
   );
 }

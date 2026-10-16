@@ -1,34 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { TV_IDS } from "@/lib/types";
 import type { TvRow } from "@/lib/types";
 
-// Returns a { [tvId]: displayName } map, falling back to "TV n" until
-// loaded or if a row is missing. Used anywhere a TV needs a human label.
-export function useTvNames() {
-  const [names, setNames] = useState<Record<number, string>>(() =>
-    Object.fromEntries(TV_IDS.map((id) => [id, `TV ${id}`]))
-  );
+const EVENT = "tvs-changed";
 
-  useEffect(() => {
-    let active = true;
-    supabase
-      .from("tvs")
-      .select("*")
-      .then(({ data }) => {
-        if (!active || !data) return;
-        const map: Record<number, string> = {};
-        (data as TvRow[]).forEach((t) => {
-          map[t.id] = t.name;
-        });
-        setNames((prev) => ({ ...prev, ...map }));
-      });
-    return () => {
-      active = false;
-    };
+// Call after adding/deleting/renaming a TV so every mounted hook reloads.
+export function notifyTvsChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(EVENT));
+}
+
+// DB-driven TV list: { tvs (sorted by id), ids, names, loaded, refresh }.
+export function useTvs() {
+  const [tvs, setTvs] = useState<TvRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const refresh = useCallback(async () => {
+    const { data } = await supabase.from("tvs").select("*").order("id");
+    if (data) setTvs(data as TvRow[]);
+    setLoaded(true);
   }, []);
 
-  return names;
+  useEffect(() => {
+    refresh();
+    window.addEventListener(EVENT, refresh);
+    return () => window.removeEventListener(EVENT, refresh);
+  }, [refresh]);
+
+  const ids = tvs.map((t) => t.id);
+  const names: Record<number, string> = {};
+  tvs.forEach((t) => {
+    names[t.id] = t.name;
+  });
+  return { tvs, ids, names, loaded, refresh };
 }

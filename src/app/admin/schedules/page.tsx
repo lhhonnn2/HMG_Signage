@@ -3,16 +3,21 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ImageRow, ScheduledImageSetRow } from "@/lib/types";
-import { WEEKDAY_LABELS, TV_IDS } from "@/lib/types";
-import { useTvNames } from "@/lib/useTvNames";
+import { WEEKDAY_LABELS } from "@/lib/types";
+import { useTvs } from "@/lib/useTvNames";
 import ImageMultiSelectGrid from "@/components/ImageMultiSelectGrid";
 
 export default function SchedulesPage() {
-  const tvNames = useTvNames();
+  const { ids: tvIds, names: tvNames } = useTvs();
   const [rows, setRows] = useState<ScheduledImageSetRow[]>([]);
   const [images, setImages] = useState<ImageRow[]>([]);
 
   const [tvId, setTvId] = useState(1);
+  // Keep the selected TV valid when the TV list loads or a TV is deleted.
+  useEffect(() => {
+    if (tvIds.length > 0 && !tvIds.includes(tvId)) setTvId(tvIds[0]);
+  }, [tvIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("12:00");
@@ -75,7 +80,7 @@ export default function SchedulesPage() {
           <div>
             <label className="label">TV</label>
             <select className="input" value={tvId} onChange={(e) => setTvId(Number(e.target.value))}>
-              {TV_IDS.map((id) => (
+              {tvIds.map((id) => (
                 <option key={id} value={id}>
                   {tvNames[id]}
                 </option>

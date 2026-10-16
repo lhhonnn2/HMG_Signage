@@ -7,8 +7,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists tvs (
   id smallint primary key,
-  name text not null,
-  check (id between 1 and 5)
+  name text not null
 );
 insert into tvs (id, name) values (1,'TV 1'),(2,'TV 2'),(3,'TV 3'),(4,'TV 4'),(5,'TV 5')
   on conflict (id) do nothing;
