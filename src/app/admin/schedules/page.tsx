@@ -63,6 +63,17 @@ export default function SchedulesPage() {
     await load();
   }
 
+  async function toggleEnabled(r: ScheduledImageSetRow) {
+    const next = r.enabled === false;
+    // optimistic update so the switch responds instantly
+    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, enabled: next } : x)));
+    const { error } = await supabase.from("scheduled_image_sets").update({ enabled: next }).eq("id", r.id);
+    if (error) {
+      alert("변경 실패: " + error.message + "\n(supabase/migration_v11.sql 을 실행했는지 확인하세요)");
+      await load();
+    }
+  }
+
   async function remove(id: string) {
     await supabase.from("scheduled_image_sets").delete().eq("id", id);
     await load();
@@ -120,15 +131,61 @@ export default function SchedulesPage() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((r) => (
-          <div key={r.id} className="card">
+          <div key={r.id} className="card" style={{ opacity: r.enabled === false ? 0.55 : 1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
               <div style={{ fontSize: 13.5 }}>
                 <b>{tvNames[r.tv_id]}</b> · {r.weekdays.map((d) => WEEKDAY_LABELS[d]).join("·")}요일 · {r.start_time.slice(0, 5)}~
                 {r.end_time.slice(0, 5)}
               </div>
-              <button className="btn btn-danger" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => remove(r.id)}>
-                삭제
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={r.enabled !== false}
+                  onClick={() => toggleEnabled(r)}
+                  title={r.enabled === false ? "꺼짐 — 눌러서 켜기" : "켜짐 — 눌러서 끄기"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: r.enabled === false ? "var(--muted)" : "var(--accent, #16a34a)",
+                    opacity: 1
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 34,
+                      height: 20,
+                      borderRadius: 10,
+                      background: r.enabled === false ? "#cbd5e1" : "#16a34a",
+                      position: "relative",
+                      transition: "background .15s"
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: r.enabled === false ? 2 : 16,
+                        width: 16,
+                        height: 16,
+                        borderRadius: 8,
+                        background: "#fff",
+                        transition: "left .15s"
+                      }}
+                    />
+                  </span>
+                  {r.enabled === false ? "OFF" : "ON"}
+                </button>
+                <button className="btn btn-danger" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => remove(r.id)}>
+                  삭제
+                </button>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
               {r.image_ids.map((imgId, i) => {

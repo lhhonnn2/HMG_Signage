@@ -120,7 +120,7 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const scheduledExtraImages = useMemo(() => {
     const weekday = now.getDay();
     return scheduledSets
-      .filter((s) => s.weekdays.includes(weekday) && timeInWindow(now, s.start_time, s.end_time))
+      .filter((s) => s.enabled !== false && s.weekdays.includes(weekday) && timeInWindow(now, s.start_time, s.end_time))
       .flatMap((s) => s.image_ids.map((id) => imageMap.get(id)).filter(Boolean) as ImageRow[]);
   }, [scheduledSets, imageMap, now]);
 

@@ -58,7 +58,8 @@ create table if not exists scheduled_image_sets (
   weekdays smallint[] not null default '{}', -- 0=Sun..6=Sat, can list several days (e.g. {0,6} for Sat+Sun) so one entry covers all of them
   start_time time not null,
   end_time time not null,
-  image_ids uuid[] not null default '{}'
+  image_ids uuid[] not null default '{}',
+  enabled boolean not null default true -- OFF = 삭제하지 않고 일시 중지
 );
 
 create table if not exists tv_audio (
@@ -134,7 +135,7 @@ alter table alarms enable row level security;
 alter table alarm_settings enable row level security;
 alter table day_plans enable row level security;
 
-create policy "public read tvs" on tvs for select using (true);
+create policy "public rw tvs" on tvs for all using (true) with check (true);
 create policy "public rw images" on images for all using (true) with check (true);
 create policy "public rw image_templates" on image_templates for all using (true) with check (true);
 create policy "public rw fonts" on fonts for all using (true) with check (true);

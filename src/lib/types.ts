@@ -52,6 +52,7 @@ export type ScheduledImageSetRow = {
   start_time: string; // HH:MM:SS
   end_time: string; // HH:MM:SS
   image_ids: string[];
+  enabled?: boolean; // false = paused (default true)
 };
 
 export type TvAudioRow = {

@@ -10,3 +10,9 @@ begin
     execute format('alter table public.tvs drop constraint %I', c);
   end loop;
 end $$;
+
+-- tvs 테이블에 쓰기(추가/이름변경/삭제) 권한 정책 추가
+-- (기존에는 읽기 정책만 있어서 TV 추가·삭제·이름 저장이 거부되었습니다)
+drop policy if exists "public read tvs" on tvs;
+drop policy if exists "public rw tvs" on tvs;
+create policy "public rw tvs" on tvs for all using (true) with check (true);
