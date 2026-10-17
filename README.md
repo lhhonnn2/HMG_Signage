@@ -80,7 +80,10 @@ https://your-app.vercel.app/player/5
 - `migration_v9.sql`까지 실행한 경우: `migration_v10.sql`만 (TV 추가/삭제 기능, 1~5 제한 해제)
 - `migration_v8.sql`까지 실행한 경우: `migration_v9.sql` → `migration_v10.sql`
 
-## 최신 업데이트 (v12: 요일별 추가 이미지 ON/OFF — migration_v11.sql 실행 필요)
+## 최신 업데이트 (v13: 알람 "다른 TV로 복사" — 마이그레이션 없음)
+- 알람 스케줄의 날짜 표 위쪽 "다른 TV로 복사" 버튼: 하루 또는 전체 날짜를 선택한 TV들에 복사(기존 알람 교체/뒤에 추가 선택). 노출 시간·알람음은 TV 설정을 그대로 따릅니다.
+
+## 이전 업데이트 (v12: 요일별 추가 이미지 ON/OFF — migration_v11.sql 실행 필요)
 - 요일별 추가 이미지 목록의 각 항목에 ON/OFF 스위치가 생겼습니다. OFF로 두면 삭제하지 않고 송출에서만 빠지며, 다시 ON 하면 바로 적용됩니다.
 
 ## 이전 업데이트 (v11: TV 추가/삭제 — migration_v10.sql 실행 필요)

@@ -38,6 +38,13 @@ export default function AlarmsPage() {
   const [importing, setImporting] = useState(false);
   const [adding, setAdding] = useState(false);
 
+  // "다른 TV로 복사" panel state
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTargets, setCopyTargets] = useState<number[]>([]);
+  const [copyScope, setCopyScope] = useState<"date" | "all">("date");
+  const [copyMode, setCopyMode] = useState<"overwrite" | "append">("overwrite");
+  const [copying, setCopying] = useState(false);
+
   async function load(preferDate?: string) {
     const { data } = await supabase
       .from("alarms")
@@ -61,6 +68,8 @@ export default function AlarmsPage() {
 
   useEffect(() => {
     setSelectedDate(null);
+    setCopyOpen(false);
+    setCopyTargets([]);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTv]);
@@ -139,6 +148,50 @@ export default function AlarmsPage() {
       setSelectedDate(dateStr);
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function copyToOtherTvs() {
+    const source = copyScope === "date" ? rows.filter((r) => r.alarm_date === selectedDate) : rows;
+    if (source.length === 0 || copyTargets.length === 0) return;
+    const dateList = Array.from(new Set(source.map((r) => r.alarm_date))).sort();
+    const targetNames = copyTargets.map((id) => tvNames[id]).join(", ");
+    const scopeText = copyScope === "date" ? dateList[0] : `${dateList.length}개 날짜 전체`;
+    const modeText =
+      copyMode === "overwrite"
+        ? `${targetNames}의 해당 날짜(${dateList.length}일) 기존 알람은 삭제되고 아래 내용으로 교체됩니다.`
+        : `${targetNames}의 기존 알람은 그대로 두고 뒤에 추가됩니다. (이미 같은 알람이 있으면 중복됩니다)`;
+    if (!confirm(`${tvNames[activeTv]}의 ${scopeText} 알람 ${source.length}건을 복사할까요?\n\n${modeText}`)) return;
+
+    setCopying(true);
+    try {
+      if (copyMode === "overwrite") {
+        const { error: delErr } = await supabase
+          .from("alarms")
+          .delete()
+          .in("tv_id", copyTargets)
+          .in("alarm_date", dateList);
+        if (delErr) throw delErr;
+      }
+      const toInsert = copyTargets.flatMap((tvId) =>
+        source.map((r) => ({
+          tv_id: tvId,
+          alarm_date: r.alarm_date,
+          alarm_time: r.alarm_time,
+          scheduled_time: r.scheduled_time,
+          program_name: r.program_name,
+          location: r.location
+        }))
+      );
+      const { error } = await supabase.from("alarms").insert(toInsert);
+      if (error) throw error;
+      alert(`${targetNames}에 알람 ${source.length}건씩 복사했습니다`);
+      setCopyOpen(false);
+      setCopyTargets([]);
+    } catch (e: any) {
+      alert("복사 중 오류: " + e.message);
+    } finally {
+      setCopying(false);
     }
   }
 
@@ -316,11 +369,82 @@ export default function AlarmsPage() {
 
           {selectedDate && (
             <>
+              {copyOpen && (
+                <div
+                  style={{
+                    border: "1px solid var(--line)",
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    background: "var(--bg, #f8fafc)"
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{tvNames[activeTv]}의 알람을 다른 TV로 복사</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>복사할 TV</span>
+                    {tvIds
+                      .filter((id) => id !== activeTv)
+                      .map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className="chip"
+                          data-active={copyTargets.includes(id)}
+                          onClick={() => setCopyTargets((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+                        >
+                          {tvNames[id]}
+                        </button>
+                      ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+                    <label style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                      <input type="radio" checked={copyScope === "date"} onChange={() => setCopyScope("date")} />
+                      {selectedDate} 하루만
+                    </label>
+                    <label style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                      <input type="radio" checked={copyScope === "all"} onChange={() => setCopyScope("all")} />
+                      이 TV의 모든 날짜 ({dates.length}일, {rows.length}건)
+                    </label>
+                  </div>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+                    <label style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                      <input type="radio" checked={copyMode === "overwrite"} onChange={() => setCopyMode("overwrite")} />
+                      대상 TV의 해당 날짜 알람을 지우고 교체 (권장)
+                    </label>
+                    <label style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                      <input type="radio" checked={copyMode === "append"} onChange={() => setCopyMode("append")} />
+                      기존 알람 뒤에 추가
+                    </label>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-accent" disabled={copying || copyTargets.length === 0} onClick={copyToOtherTvs}>
+                      {copying ? "복사 중..." : "복사하기"}
+                    </button>
+                    <button className="btn btn-outline" onClick={() => setCopyOpen(false)}>
+                      닫기
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
+                    복사된 알람은 각 TV에서 독립적으로 수정됩니다. 노출 시간과 알람음은 복사되지 않고 TV별 설정을 그대로 따릅니다.
+                  </div>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{selectedDate}</div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button className="btn btn-outline" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => addRow(selectedDate)}>
                     + 이 날짜에 추가
+                  </button>
+                  <button
+                    className="btn btn-outline"
+                    style={{ fontSize: 12, padding: "5px 10px" }}
+                    disabled={tvIds.length < 2}
+                    onClick={() => setCopyOpen((v) => !v)}
+                  >
+                    다른 TV로 복사
                   </button>
                   <button className="btn btn-danger" style={{ fontSize: 12, padding: "5px 10px" }} onClick={() => removeDate(selectedDate)}>
                     이 날짜 전체 삭제
