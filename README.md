@@ -75,11 +75,15 @@ https://your-app.vercel.app/player/5
 버전에 따라 필요한 파일만 순서대로 실행하면 됩니다 (이미 실행한 파일은 건너뛰어도 됩니다):
 
 - 처음 설치: `schema.sql`만 실행
-- `schema.sql`만 실행해본 경우: `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql` → `migration_v5.sql` → `migration_v6.sql` → `migration_v7.sql` → `migration_v8.sql` → `migration_v9.sql` → `migration_v10.sql`
+- `schema.sql`만 실행해본 경우: `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql` → `migration_v5.sql` → `migration_v6.sql` → `migration_v7.sql` → `migration_v8.sql` → `migration_v9.sql` → `migration_v10.sql` → `migration_v11.sql`
+- `migration_v10.sql`까지 실행한 경우: `migration_v11.sql`만
 - `migration_v9.sql`까지 실행한 경우: `migration_v10.sql`만 (TV 추가/삭제 기능, 1~5 제한 해제)
 - `migration_v8.sql`까지 실행한 경우: `migration_v9.sql` → `migration_v10.sql`
 
-## 최신 업데이트 (v11: TV 추가/삭제 — migration_v10.sql 실행 필요)
+## 최신 업데이트 (v12: 요일별 추가 이미지 ON/OFF — migration_v11.sql 실행 필요)
+- 요일별 추가 이미지 목록의 각 항목에 ON/OFF 스위치가 생겼습니다. OFF로 두면 삭제하지 않고 송출에서만 빠지며, 다시 ON 하면 바로 적용됩니다.
+
+## 이전 업데이트 (v11: TV 추가/삭제 — migration_v10.sql 실행 필요)
 - 관리자 > TV 설정에서 "+ TV 추가"로 TV를 늘리고, "이 TV 삭제"로 지울 수 있습니다 (삭제 시 해당 TV의 모든 설정·알람 함께 삭제).
 
 ## 이전 업데이트 (v10)
