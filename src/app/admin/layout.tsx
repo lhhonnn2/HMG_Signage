@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTvs } from "@/lib/useTvNames";
+import ServerStatusBox from "@/components/ServerStatusBox";
 
 const NAV = [
   { href: "/admin", label: "대시보드" },
@@ -93,7 +94,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <aside className={`admin-sidebar${menuOpen ? " open" : ""}`}>{sidebarContent}</aside>
 
-      <main className="admin-main">{children}</main>
+      <main className="admin-main">
+        <ServerStatusBox />
+        {children}
+      </main>
     </div>
   );
 }
