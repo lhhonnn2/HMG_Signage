@@ -230,3 +230,7 @@ https://your-app.vercel.app/player/5
 - 프로그램 분류: 프로그램 직접 추가, 어디에도 쓰이지 않는 프로그램 삭제, 여러 개 선택해 한 번에 지정(브랜드·상세를 이름에서 자동 인식 가능, 예: "기아 레벨 1" → 기아 / 레벨 1), 하단 "등록된 카테고리" 접이식 목록에서 이름 수정·삭제.
 - 알람 서식 설정 세로 미리보기 기준을 SERO 4K 43형에 맞춰 1080×1920으로 변경(565×1228, 2160×3840 선택 가능).
 - 수정 파일: src/components/phone/ProgramClassifier.tsx, src/components/phone/CategoryManager.tsx, src/app/admin/phone-alarms/page.tsx, src/app/admin/settings/page.tsx, README.md
+
+### v16.3 수정
+- /notify "받을 카테고리" 디자인 정리: 구분·브랜드·카테고리를 색이 다른 구역(번호 배지)으로 나누고, 선택 버튼은 네모 모양(선택 시 구역 색으로 채움), "전체/해제"는 각 구역 오른쪽 끝의 텍스트 버튼, 맨 위 전체선택/전체해제는 오른쪽 정렬.
+- 수정 파일: src/app/notify/page.tsx, README.md

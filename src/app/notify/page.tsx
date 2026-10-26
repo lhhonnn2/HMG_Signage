@@ -45,11 +45,51 @@ function todayStr() {
 
 type Support = "checking" | "ok" | "ios-install" | "unsupported";
 
-const ROWS: { key: FacetKey; title: string }[] = [
-  { key: "divisions", title: "구분" },
-  { key: "brands", title: "브랜드" },
-  { key: "names", title: "카테고리" }
+const ROWS: { key: FacetKey; step: number; title: string; color: string; tint: string }[] = [
+  { key: "divisions", step: 1, title: "구분", color: "#2563eb", tint: "#eff6ff" },
+  { key: "brands", step: 2, title: "브랜드", color: "#7c3aed", tint: "#f5f3ff" },
+  { key: "names", step: 3, title: "카테고리", color: "#059669", tint: "#ecfdf5" }
 ];
+
+// Square option button (selected = filled with the section color).
+function OptionButton({ label, active, color, onClick }: { label: string; active: boolean; color: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        minHeight: 40,
+        padding: "8px 10px",
+        borderRadius: 6,
+        border: `1.5px solid ${active ? color : "#d1d5db"}`,
+        background: active ? color : "#fff",
+        color: active ? "#fff" : "var(--ink)",
+        fontSize: 13.5,
+        fontWeight: active ? 700 : 500,
+        lineHeight: 1.25,
+        textAlign: "center",
+        cursor: "pointer",
+        wordBreak: "keep-all"
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// Small text-style action (전체 / 해제): visually unlike the option buttons.
+function TextAction({ label, onClick, color }: { label: string; onClick: () => void; color: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ background: "none", border: "none", padding: "4px 2px", fontSize: 12.5, fontWeight: 600, color, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function NotifyPage() {
   const [cats, setCats] = useState<PhoneCategoryRow[]>([]);
@@ -240,8 +280,6 @@ export default function NotifyPage() {
     }
   }
 
-  const smallBtn = { fontSize: 12, padding: "3px 9px" } as const;
-
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 16px 40px" }}>
       <div className="page-title">🔔 알림 받기</div>
@@ -284,13 +322,21 @@ export default function NotifyPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
-          <div style={{ fontWeight: 600 }}>받을 카테고리</div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" className="btn btn-outline" style={smallBtn} onClick={() => changeFacets(selectEverything(cats))}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>받을 카테고리</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => changeFacets(selectEverything(cats))}
+              style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #9ca3af", background: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
+            >
               전체선택
             </button>
-            <button type="button" className="btn btn-outline" style={smallBtn} onClick={() => setFacets(emptyFacets())}>
+            <button
+              type="button"
+              onClick={() => setFacets(emptyFacets())}
+              style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #fca5a5", background: "#fff", color: "#b91c1c", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
+            >
               전체해제
             </button>
           </div>
@@ -298,32 +344,38 @@ export default function NotifyPage() {
 
         {cats.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>등록된 카테고리가 없습니다.</div>}
 
-        {cats.length > 0 &&
-          ROWS.map(({ key, title }) => (
-            <div key={key} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600 }}>{title}</span>
-                <button type="button" className="btn btn-outline" style={smallBtn} onClick={() => changeFacets(selectAllInRow(cats, facets, key))}>
-                  전체
-                </button>
-                <button type="button" className="btn btn-outline" style={smallBtn} onClick={() => setFacets(clearRow(facets, key))}>
-                  해제
-                </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {cats.length > 0 &&
+            ROWS.map(({ key, step, title, color, tint }) => (
+              <div key={key} style={{ background: tint, border: "1px solid #e5e7eb", borderLeft: `4px solid ${color}`, borderRadius: 8, padding: "10px 12px 12px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span
+                      style={{ width: 20, height: 20, borderRadius: 4, background: color, color: "#fff", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      {step}
+                    </span>
+                    <span style={{ fontWeight: 700, fontSize: 14, color }}>{title}</span>
+                    {facets[key].length > 0 && <span style={{ fontSize: 12, color: "var(--muted)" }}>{facets[key].length}개 선택</span>}
+                  </div>
+                  <div style={{ display: "flex", gap: 14 }}>
+                    <TextAction label="전체" color={color} onClick={() => changeFacets(selectAllInRow(cats, facets, key))} />
+                    <TextAction label="해제" color="#6b7280" onClick={() => setFacets(clearRow(facets, key))} />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 8 }}>
+                  {options[key].map((v) => (
+                    <OptionButton key={v} label={v} color={color} active={facets[key].includes(v)} onClick={() => changeFacets(toggleFacet(cats, facets, key, v))} />
+                  ))}
+                  {options[key].length === 0 && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>해당 없음</span>}
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {options[key].map((v) => (
-                  <button key={v} type="button" className="chip" data-active={facets[key].includes(v)} onClick={() => changeFacets(toggleFacet(cats, facets, key, v))}>
-                    {v}
-                  </button>
-                ))}
-                {options[key].length === 0 && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>해당 없음</span>}
-              </div>
-            </div>
-          ))}
+            ))}
+        </div>
 
-        <div style={{ fontSize: 12, color: "var(--muted)" }}>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 12, lineHeight: 1.6 }}>
           {facetActive(facets)
-            ? `선택한 조건에 맞는 카테고리 ${matchedCount}개의 프로그램을 받습니다. 한 줄에서 여러 개를 고르면 "또는", 줄끼리는 "그리고"로 적용됩니다. 고르지 않은 줄은 제한이 없습니다.`
+            ? `선택한 조건에 맞는 카테고리 ${matchedCount}개의 프로그램을 받습니다. 한 구역에서 여러 개를 고르면 "또는", 구역끼리는 "그리고"로 적용됩니다. 고르지 않은 구역은 제한이 없습니다.`
             : "구분·브랜드·카테고리를 눌러 받을 범위를 정하세요. 브랜드나 카테고리를 먼저 골라도 됩니다."}
         </div>
       </div>
