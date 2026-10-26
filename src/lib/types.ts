@@ -73,17 +73,22 @@ export type AlarmRow = {
 
 export type PhoneCategoryRow = {
   id: string;
-  name: string;
+  division: string; // DX / DP
+  brand: string; // 현대 / 기아 / 제네시스 / HMG
+  name: string; // 레벨1, 베이직 드라이브 lite ...
 };
 
-export type PhoneAlarmRow = {
+export type PhoneTimetableRow = {
   id: string;
-  category_id: string;
   alarm_date: string; // YYYY-MM-DD
-  alarm_time: string; // HH:MM:SS — when the phone notification is sent
-  scheduled_time: string; // HH:MM:SS — announced start time (used to compute "N분 전")
+  start_time: string; // HH:MM:SS — announced start; notification time = start − each phone's chosen minutes
   program_name: string;
-  location: string;
+  location: string; // optional
+};
+
+export type PhoneProgramRow = {
+  name: string;
+  category_id: string | null;
 };
 
 export type DayPlanRow = {

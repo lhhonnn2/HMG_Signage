@@ -9,9 +9,17 @@ export async function POST(req: NextRequest) {
   if (!endpoint) return NextResponse.json({ error: "endpoint required" }, { status: 400 });
   const { data, error } = await supabaseServer()
     .from("push_subscriptions")
-    .select("tv_ids, category_ids")
+    .select("divisions, brands, category_names, excluded_programs, extra_programs, lead_minutes")
     .eq("endpoint", endpoint)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ found: !!data, tv_ids: data?.tv_ids ?? [], category_ids: data?.category_ids ?? [] });
+  return NextResponse.json({
+    found: !!data,
+    divisions: data?.divisions ?? [],
+    brands: data?.brands ?? [],
+    category_names: data?.category_names ?? [],
+    excluded_programs: data?.excluded_programs ?? [],
+    extra_programs: data?.extra_programs ?? [],
+    lead_minutes: data?.lead_minutes ?? 5
+  });
 }

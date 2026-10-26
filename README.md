@@ -193,3 +193,28 @@ https://your-app.vercel.app/player/5
 - 알람 시각 후 3분 이내에 서버가 호출될 때만 전송(그 이후 늦게 등록한 과거 알람은 보내지 않음).
 - 새 파일: migration_v12.sql, public/(sw.js, manifest.webmanifest, 아이콘 3개), src/lib/(pushLogic.ts, webpush.ts), src/app/notify/, src/app/api/push/(cron, subscribe, unsubscribe, lookup, test, stats), src/app/admin/phone-alarms/page.tsx
 - 수정 파일: package.json, package-lock.json(web-push 추가), src/lib/types.ts, src/app/admin/layout.tsx, src/app/admin/page.tsx, .env.example, README.md
+
+### v15.1 수정
+- /notify: TV 알람 선택 제거(폰 전용 카테고리만 선택), 아이폰 홈 화면 추가 안내 문구/번호 개선.
+- 푸시 발송(`/api/push/cron`)은 폰 전용 알람(카테고리)만 대상으로 함. TV 알람은 폰으로 보내지 않음.
+- 수정 파일: src/app/notify/page.tsx, src/app/api/push/cron/route.ts, src/app/api/push/stats/route.ts, src/app/admin/phone-alarms/page.tsx, README.md
+
+## 릴리스 v16 — 폰 알림 개편 (3단계)
+
+**먼저 `supabase/migration_v13.sql` 실행** (v12의 폰 알람 테스트 데이터/카테고리는 삭제됨. 구독한 폰 정보는 유지되지만 선택 내용은 다시 저장해야 함).
+
+### 바뀐 점
+- 카테고리 = **구분(DX/DP) → 브랜드(현대/기아/제네시스/HMG) → 카테고리 이름**. 관리자 "폰 알람 → 카테고리" 탭에서 추가/이름변경/삭제. 같은 이름(예: 베이직 드라이브)을 브랜드별로 각각 추가 가능.
+- 폰 타임테이블: **날짜 · 시작시각 · 프로그램명 · 장소(선택)**. 알람시각 없음(직원이 고른 "N분 전"으로 계산). 엑셀 열: 날짜, 시작예정시각, 프로그램명, 렉처룸(비워도 됨). 플랜 적용, 날짜 탭, 표 편집, "다른 날짜로 복사" 지원.
+- **프로그램 → 카테고리**는 프로그램 이름 기준으로 한 번만 지정("프로그램 분류" 탭 또는 타임테이블 표의 카테고리 칸). 이후 같은 이름은 자동 분류. 미분류 프로그램은 카테고리로는 알림이 가지 않음.
+- 직원 화면(/notify): "몇 분 전"(1·3·5·10·15·20·30 중 한 가지), 구분/브랜드/카테고리 칩(선택에 따라 연결되는 항목만 표시, 줄별 전체/해제, 전체선택/전체해제), 날짜별 타임테이블에서 프로그램 단위 켜기/끄기(이름 기준으로 매일 유지).
+- 같은 시각에 프로그램이 여러 개면 알림이 각각 감(묶음 없음).
+- TV 알람은 변경 없음(폰으로 보내지 않음).
+
+### 선택 규칙
+- 같은 줄에서 여러 개 = "또는", 줄끼리 = "그리고". 고르지 않은 줄은 제한 없음. 세 줄이 모두 비어 있으면 아무것도 받지 않음.
+- 개별 프로그램 끄기/켜기는 카테고리 선택보다 우선.
+
+### 파일
+- 새 파일: supabase/migration_v13.sql, src/lib/facets.ts, src/components/phone/(shared.ts, CategoryManager.tsx, ProgramClassifier.tsx, PhoneTimetable.tsx)
+- 수정/교체: src/lib/pushLogic.ts, src/lib/types.ts, src/app/notify/page.tsx, src/app/admin/phone-alarms/page.tsx, src/app/api/push/(cron, subscribe, lookup, stats)/route.ts, README.md
