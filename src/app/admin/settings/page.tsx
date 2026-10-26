@@ -1,13 +1,48 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { uploadFile } from "@/lib/uploadFile";
 import type { AlarmSettingsRow, FontRow } from "@/lib/types";
 import { DEFAULT_TEMPLATE, renderAlarmLines, contrastTextColor } from "@/lib/types";
 
-const SAMPLE = { program_name: "오프로드 체험", location: "1번 트랙 앞", scheduled_time: "10:00" };
-const SAMPLE_2 = { program_name: "짐카나 체험", location: "2번 트랙 앞", scheduled_time: "10:05" };
+const SAMPLE = { program_name: "현대 베이직 드라이브 Lite", location: "1번 렉처룸", scheduled_time: "10:00" };
+const SAMPLE_2 = { program_name: "기아 레벨 1", location: "2번 렉처룸", scheduled_time: "10:05" };
+
+// Real screen sizes (CSS px) the previews are drawn at, then scaled down to fit
+// the box — so a font size here looks on the preview exactly as proportioned
+// as it does on the TV.
+const LANDSCAPE_SIZES = [
+  { value: "1920x1080", w: 1920, h: 1080, label: "1920×1080 (FHD, 기본)" },
+  { value: "1280x720", w: 1280, h: 720, label: "1280×720" },
+  { value: "3840x2160", w: 3840, h: 2160, label: "3840×2160 (4K)" }
+];
+const PORTRAIT_SIZE = { w: 565, h: 1228 };
+
+// Draws `children` on a virtual screen of width×height real pixels and shrinks
+// it to fit the available width (and optional max height).
+function ScaledScreen({ width, height, maxHeight, children }: { width: number; height: number; maxHeight?: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [boxW, setBoxW] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setBoxW(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  let scale = boxW > 0 ? boxW / width : 0.2;
+  if (maxHeight) scale = Math.min(scale, maxHeight / height);
+  return (
+    <div ref={ref} style={{ width: "100%" }}>
+      <div style={{ width: width * scale, height: height * scale, margin: "0 auto", overflow: "hidden", borderRadius: 12, position: "relative" }}>
+        <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
 
 type PreviewMode = "landscape" | "portrait" | "split";
 
@@ -29,6 +64,7 @@ export default function AlarmSettingsPage() {
   const [backgroundColor, setBackgroundColor] = useState("#000000");
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("landscape");
+  const [landscapeSize, setLandscapeSize] = useState(LANDSCAPE_SIZES[0].value);
 
   const lines = template.split("\n");
 
@@ -110,22 +146,31 @@ export default function AlarmSettingsPage() {
   const previewFamily = previewFont ? `preview-font-${previewFont.id}` : "inherit";
   const textColor = contrastTextColor(backgroundColor);
 
-  // 0.42 approximates "this box's rendered height relative to a real TV
-  // screen (~1080-1230px tall)" so the preview's font size looks roughly
-  // like what actually shows up on screen.
-  const SCALE = 0.42;
+  const LS = LANDSCAPE_SIZES.find((x) => x.value === landscapeSize) ?? LANDSCAPE_SIZES[0];
 
-  function renderLines(vars: typeof SAMPLE, scale: number) {
-    return renderAlarmLines(template, vars).map((text, i) => {
-      const size = sizeFor(i);
-      const scaled = Math.max(6, Math.round(size * scale));
-      return (
-        <div key={i} style={{ fontFamily: previewFamily, fontSize: scaled, fontWeight: i === 0 ? 700 : 500, lineHeight: 1.4 }}>
-          {text}
-        </div>
-      );
-    });
+  // Same markup/sizes the player uses (see AlarmView): real px font sizes, gap 16, side padding 24.
+  function renderLines(vars: typeof SAMPLE) {
+    return renderAlarmLines(template, vars).map((text, i) => (
+      <div key={i} style={{ fontFamily: previewFamily, fontSize: sizeFor(i), fontWeight: i === 0 ? 700 : 500, lineHeight: 1.4 }}>
+        {text}
+      </div>
+    ));
   }
+
+  const screenStyle = {
+    width: "100%",
+    height: "100%",
+    background: backgroundColor,
+    color: textColor,
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    textAlign: "center" as const,
+    padding: "0 24px",
+    overflow: "hidden"
+  };
 
   return (
     <div>
@@ -242,7 +287,7 @@ export default function AlarmSettingsPage() {
 
         <div style={{ position: "sticky", top: 32 }}>
           <div className="label" style={{ marginBottom: 8 }}>
-            실시간 미리보기 (예시 값 기준)
+            실시간 미리보기 (예시 값 기준 · 실제 TV와 같은 비율)
           </div>
           <div className="chip-row" style={{ marginBottom: 10 }}>
             {PREVIEW_MODES.map((m) => (
@@ -255,47 +300,27 @@ export default function AlarmSettingsPage() {
           {previewFont && <style>{`@font-face { font-family: '${previewFamily}'; src: url('${previewFont.url}'); }`}</style>}
 
           {previewMode === "landscape" && (
-            <div
-              style={{
-                background: backgroundColor,
-                color: textColor,
-                borderRadius: 12,
-                aspectRatio: "16 / 9",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "1.2%",
-                textAlign: "center",
-                padding: "4%",
-                overflow: "hidden"
-              }}
-            >
-              {renderLines(SAMPLE, SCALE)}
-            </div>
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12, color: "var(--muted)", flexWrap: "wrap" }}>
+                TV 화면 크기 기준
+                <select className="input" style={{ width: 190, padding: "4px 8px", fontSize: 12 }} value={landscapeSize} onChange={(e) => setLandscapeSize(e.target.value)}>
+                  {LANDSCAPE_SIZES.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <ScaledScreen width={LS.w} height={LS.h}>
+                <div style={screenStyle}>{renderLines(SAMPLE)}</div>
+              </ScaledScreen>
+            </>
           )}
 
           {previewMode === "portrait" && (
-            <div
-              style={{
-                background: backgroundColor,
-                color: textColor,
-                borderRadius: 12,
-                aspectRatio: "565 / 1228",
-                maxHeight: 560,
-                margin: "0 auto",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "1.2%",
-                textAlign: "center",
-                padding: "5% 6%",
-                overflow: "hidden"
-              }}
-            >
-              {renderLines(SAMPLE, SCALE)}
-            </div>
+            <ScaledScreen width={PORTRAIT_SIZE.w} height={PORTRAIT_SIZE.h} maxHeight={560}>
+              <div style={screenStyle}>{renderLines(SAMPLE)}</div>
+            </ScaledScreen>
           )}
 
           {previewMode === "split" && (
@@ -304,43 +329,16 @@ export default function AlarmSettingsPage() {
                 같은 시각에 알람이 2개 겹치면 화면이 이렇게 위/아래로 나뉘어 각각 표시됩니다 (글자 크기는 줄이지 않고 그대로 적용됩니다 —
                 칸이 좁아 넘칠 수 있다면 여기서 바로 확인하고 크기를 조절하세요).
               </div>
-              <div style={{ borderRadius: 12, aspectRatio: "16 / 9", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                <div
-                  style={{
-                    flex: 1,
-                    background: backgroundColor,
-                    color: textColor,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "1.2%",
-                    textAlign: "center",
-                    padding: "2% 4%",
-                    overflow: "hidden",
-                    borderBottom: "1px solid rgba(128,128,128,0.4)"
-                  }}
-                >
-                  {renderLines(SAMPLE, SCALE)}
+              <ScaledScreen width={LS.w} height={LS.h}>
+                <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>
+                  <div style={{ width: "100%", height: "50%", borderBottom: "1px solid #222" }}>
+                    <div style={screenStyle}>{renderLines(SAMPLE)}</div>
+                  </div>
+                  <div style={{ width: "100%", height: "50%" }}>
+                    <div style={screenStyle}>{renderLines(SAMPLE_2)}</div>
+                  </div>
                 </div>
-                <div
-                  style={{
-                    flex: 1,
-                    background: backgroundColor,
-                    color: textColor,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "1.2%",
-                    textAlign: "center",
-                    padding: "2% 4%",
-                    overflow: "hidden"
-                  }}
-                >
-                  {renderLines(SAMPLE_2, SCALE)}
-                </div>
-              </div>
+              </ScaledScreen>
             </div>
           )}
         </div>

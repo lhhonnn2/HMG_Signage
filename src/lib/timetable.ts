@@ -53,10 +53,10 @@ export function parseTimetableSheet(sheet: XLSX.WorkSheet): TimetableRow[] {
     const program = cols.program !== undefined ? row[cols.program] : "";
     const start = cols.start !== undefined ? row[cols.start] : "";
     const room = cols.room !== undefined ? row[cols.room] : "";
-    if (!program || start === "" || !room) continue;
+    if (!program || start === "") continue; // room (장소) may be empty: such programs are phone-notification only
     rows.push({
       program_name: String(program).trim(),
-      location: String(room).trim(),
+      location: String(room ?? "").trim(),
       start_time: normalizeTimeCell(start)
     });
   }

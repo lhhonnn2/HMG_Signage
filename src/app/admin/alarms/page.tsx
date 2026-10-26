@@ -85,13 +85,16 @@ export default function AlarmsPage() {
   async function applyPlan() {
     const plan = plans.find((p) => p.id === planChoice);
     if (!plan) return;
-    if (plan.rows.length === 0) {
-      alert("이 플랜에 항목이 없습니다");
+    // TV alarms are only for programs that have a location; location-less
+    // programs in a plan are used for phone notifications only.
+    const tvRows = plan.rows.filter((r) => (r.location || "").trim() !== "");
+    if (tvRows.length === 0) {
+      alert("이 플랜에 장소가 있는 항목이 없습니다");
       return;
     }
     setApplyingPlan(true);
     try {
-      const toInsert = plan.rows.map((r) => ({
+      const toInsert = tvRows.map((r) => ({
         tv_id: activeTv,
         alarm_date: planDate,
         alarm_time: subtractMinutes(r.start_time, planOffset),
@@ -321,7 +324,7 @@ export default function AlarmsPage() {
               <option value="">플랜 선택...</option>
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.rows.length}개)
+                  {p.name} ({p.rows.filter((r) => (r.location || "").trim() !== "").length}개)
                 </option>
               ))}
             </select>

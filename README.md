@@ -218,3 +218,9 @@ https://your-app.vercel.app/player/5
 ### 파일
 - 새 파일: supabase/migration_v13.sql, src/lib/facets.ts, src/components/phone/(shared.ts, CategoryManager.tsx, ProgramClassifier.tsx, PhoneTimetable.tsx)
 - 수정/교체: src/lib/pushLogic.ts, src/lib/types.ts, src/app/notify/page.tsx, src/app/admin/phone-alarms/page.tsx, src/app/api/push/(cron, subscribe, lookup, stats)/route.ts, README.md
+
+### v16.1 수정
+- 플랜(마스터 타임테이블) 업로드 시 **장소가 비어 있는 프로그램도 플랜에 포함**(시작시각·프로그램명은 필수). 폰 타임테이블에는 전부 들어가고, TV 알람 "플랜에서 일괄 생성"에는 장소 있는 행만 들어감. 기존에 저장된 플랜에 장소 없는 프로그램을 넣으려면 마스터 엑셀을 다시 업로드(같은 이름 플랜 덮어쓰기).
+- 폰 타임테이블 엑셀: 시작예정시각이 빈 행은 00:00으로 들어가던 문제 → 건너뛰고 개수를 알려줌.
+- 알람 서식 설정 미리보기: 예시 값을 "현대 베이직 드라이브 Lite / 1번 렉처룸"으로 변경, 미리보기를 실제 화면 크기(가로 1920×1080 기본·선택 가능, 세로 565×1228)로 그린 뒤 비율대로 축소 → 글자 크기가 TV와 같은 비율로 보임.
+- 수정 파일: src/lib/timetable.ts, src/app/admin/alarms/page.tsx, src/app/admin/day-plans/page.tsx, src/app/admin/settings/page.tsx, src/components/phone/PhoneTimetable.tsx, README.md

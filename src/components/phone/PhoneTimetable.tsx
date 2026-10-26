@@ -197,11 +197,15 @@ export default function PhoneTimetable({ cats, progMap, reloadPrograms, onChange
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const excelRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-      const toInsert = excelRows
-        .filter((row) => String(row["날짜"] ?? "").trim() !== "" || row["날짜"] instanceof Date)
+      const dated = excelRows.filter((row) => String(row["날짜"] ?? "").trim() !== "" || row["날짜"] instanceof Date);
+      const startCell = (row: any) => row["시작예정시각"] ?? row["시작시각"] ?? row["시작"];
+      // A blank start time would silently become 00:00, so those rows are skipped and reported.
+      const valid = dated.filter((row) => String(startCell(row) ?? "").trim() !== "");
+      const skipped = dated.length - valid.length;
+      const toInsert = valid
         .map((row) => ({
           alarm_date: normalizeDateCell(row["날짜"]),
-          start_time: normalizeTimeCell(row["시작예정시각"] ?? row["시작시각"] ?? row["시작"]),
+          start_time: normalizeTimeCell(startCell(row)),
           program_name: String(row["프로그램명"] ?? "").trim(),
           location: String(row["렉처룸"] ?? row["장소"] ?? "").trim()
         }));
@@ -213,7 +217,11 @@ export default function PhoneTimetable({ cats, progMap, reloadPrograms, onChange
       const { error } = await supabase.from("phone_timetable").insert(toInsert);
       if (error) throw error;
       const un = unclassifiedIn(toInsert.map((r) => r.program_name));
-      alert(`${toInsert.length}건 등록되었습니다` + (un.length ? `\n\n미분류 프로그램 ${un.length}개가 있습니다. "프로그램 분류" 탭에서 카테고리를 지정해주세요.` : ""));
+      alert(
+        `${toInsert.length}건 등록되었습니다` +
+          (skipped > 0 ? `\n시작예정시각이 비어 있어 건너뛴 행: ${skipped}건` : "") +
+          (un.length ? `\n\n미분류 프로그램 ${un.length}개가 있습니다. "프로그램 분류" 탭에서 카테고리를 지정해주세요.` : "")
+      );
       await load(toInsert[0]?.alarm_date);
       onChanged();
     } catch (e: any) {
@@ -260,7 +268,7 @@ export default function PhoneTimetable({ cats, progMap, reloadPrograms, onChange
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>플랜에서 일괄 생성</div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
-          "플랜 관리"의 마스터 타임테이블을 날짜에 적용합니다. 플랜에는 장소가 있는 프로그램만 들어 있으므로, 장소 없는 프로그램은 아래에서 따로 추가하세요.
+          "플랜 관리"의 마스터 타임테이블을 날짜에 적용합니다. 장소가 비어 있는 프로그램도 모두 들어갑니다(TV 알람에는 장소가 있는 것만 들어갑니다).
         </div>
         {plans.length === 0 ? (
           <div style={{ fontSize: 13, color: "var(--muted)" }}>

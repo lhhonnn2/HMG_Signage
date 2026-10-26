@@ -94,7 +94,7 @@ export default function DayPlansPage() {
         <div style={{ fontWeight: 600, marginBottom: 6 }}>마스터 타임테이블 업로드</div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
           시트마다 시작(예정)시각 · 프로그램명 · 렉처룸(장소) 열이 있으면 자동으로 인식됩니다. 같은 이름의 플랜이 이미 있으면 내용을
-          덮어씁니다.
+          덮어씁니다. 장소가 비어 있는 프로그램도 플랜에 들어가며, 폰 알림에만 쓰이고 TV 알람에는 들어가지 않습니다.
         </div>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" disabled={parsing} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
         {parsing && <div style={{ fontSize: 13, color: "var(--accent)", marginTop: 8 }}>분석 중...</div>}
