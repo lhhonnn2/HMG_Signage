@@ -17,7 +17,11 @@ const LANDSCAPE_SIZES = [
   { value: "1280x720", w: 1280, h: 720, label: "1280×720" },
   { value: "3840x2160", w: 3840, h: 2160, label: "3840×2160 (4K)" }
 ];
-const PORTRAIT_SIZE = { w: 565, h: 1228 };
+const PORTRAIT_SIZES = [
+  { value: "1080x1920", w: 1080, h: 1920, label: "1080×1920 (SERO 4K 43형, 기본)" },
+  { value: "565x1228", w: 565, h: 1228, label: "565×1228" },
+  { value: "2160x3840", w: 2160, h: 3840, label: "2160×3840 (4K 실제 해상도)" }
+];
 
 // Draws `children` on a virtual screen of width×height real pixels and shrinks
 // it to fit the available width (and optional max height).
@@ -48,7 +52,7 @@ type PreviewMode = "landscape" | "portrait" | "split";
 
 const PREVIEW_MODES: { value: PreviewMode; label: string }[] = [
   { value: "landscape", label: "가로 (16:9)" },
-  { value: "portrait", label: "세로 (565×1228)" },
+  { value: "portrait", label: "세로 (SERO)" },
   { value: "split", label: "알람 2개 (2분할)" }
 ];
 
@@ -65,6 +69,7 @@ export default function AlarmSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("landscape");
   const [landscapeSize, setLandscapeSize] = useState(LANDSCAPE_SIZES[0].value);
+  const [portraitSize, setPortraitSize] = useState(PORTRAIT_SIZES[0].value);
 
   const lines = template.split("\n");
 
@@ -146,6 +151,7 @@ export default function AlarmSettingsPage() {
   const previewFamily = previewFont ? `preview-font-${previewFont.id}` : "inherit";
   const textColor = contrastTextColor(backgroundColor);
 
+  const PS = PORTRAIT_SIZES.find((x) => x.value === portraitSize) ?? PORTRAIT_SIZES[0];
   const LS = LANDSCAPE_SIZES.find((x) => x.value === landscapeSize) ?? LANDSCAPE_SIZES[0];
 
   // Same markup/sizes the player uses (see AlarmView): real px font sizes, gap 16, side padding 24.
@@ -318,9 +324,21 @@ export default function AlarmSettingsPage() {
           )}
 
           {previewMode === "portrait" && (
-            <ScaledScreen width={PORTRAIT_SIZE.w} height={PORTRAIT_SIZE.h} maxHeight={560}>
-              <div style={screenStyle}>{renderLines(SAMPLE)}</div>
-            </ScaledScreen>
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12, color: "var(--muted)", flexWrap: "wrap" }}>
+                세로 TV 화면 크기 기준
+                <select className="input" style={{ width: 240, padding: "4px 8px", fontSize: 12 }} value={portraitSize} onChange={(e) => setPortraitSize(e.target.value)}>
+                  {PORTRAIT_SIZES.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <ScaledScreen width={PS.w} height={PS.h} maxHeight={560}>
+                <div style={screenStyle}>{renderLines(SAMPLE)}</div>
+              </ScaledScreen>
+            </>
           )}
 
           {previewMode === "split" && (

@@ -6,9 +6,8 @@ import type { PhoneCategoryRow, PhoneProgramRow } from "@/lib/types";
 import { normalizeProgram } from "@/lib/pushLogic";
 import PhoneTimetable from "@/components/phone/PhoneTimetable";
 import ProgramClassifier from "@/components/phone/ProgramClassifier";
-import CategoryManager from "@/components/phone/CategoryManager";
 
-type Tab = "timetable" | "programs" | "categories";
+type Tab = "timetable" | "programs";
 type Stats = { configured: boolean; cronSecretSet: boolean; total: number };
 
 export default function PhoneAlarmsPage() {
@@ -44,7 +43,7 @@ export default function PhoneAlarmsPage() {
     <div>
       <div className="page-title">폰 알람</div>
       <div className="page-subtitle">
-        TV와 별개로 폰으로만 보내는 알림입니다. 타임테이블을 넣고, 프로그램마다 카테고리(구분 → 브랜드 → 카테고리)를 한 번 지정해 두면 직원이 원하는 범위를 골라 받습니다.
+        TV와 별개로 폰으로만 보내는 알림입니다. 타임테이블을 넣고, "프로그램 분류"에서 프로그램마다 구분 → 브랜드 → 상세를 한 번 지정해 두면 직원이 원하는 범위를 골라 받습니다.
       </div>
 
       <div className="card" style={{ marginBottom: 16, fontSize: 13, lineHeight: 1.7 }}>
@@ -78,16 +77,14 @@ export default function PhoneAlarmsPage() {
         <button className="chip" data-active={tab === "programs"} onClick={() => setTab("programs")}>
           프로그램 분류
         </button>
-        <button className="chip" data-active={tab === "categories"} onClick={() => setTab("categories")}>
-          카테고리 ({cats.length})
-        </button>
       </div>
 
       {tab === "timetable" && (
         <PhoneTimetable cats={cats} progMap={progMap} reloadPrograms={loadPrograms} onChanged={() => setRefreshKey((k) => k + 1)} />
       )}
-      {tab === "programs" && <ProgramClassifier cats={cats} progMap={progMap} reloadPrograms={loadPrograms} refreshKey={refreshKey} />}
-      {tab === "categories" && <CategoryManager cats={cats} reload={loadCats} />}
+      {tab === "programs" && (
+        <ProgramClassifier cats={cats} progMap={progMap} reloadCats={loadCats} reloadPrograms={loadPrograms} refreshKey={refreshKey} />
+      )}
     </div>
   );
 }

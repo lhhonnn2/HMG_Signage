@@ -224,3 +224,9 @@ https://your-app.vercel.app/player/5
 - 폰 타임테이블 엑셀: 시작예정시각이 빈 행은 00:00으로 들어가던 문제 → 건너뛰고 개수를 알려줌.
 - 알람 서식 설정 미리보기: 예시 값을 "현대 베이직 드라이브 Lite / 1번 렉처룸"으로 변경, 미리보기를 실제 화면 크기(가로 1920×1080 기본·선택 가능, 세로 565×1228)로 그린 뒤 비율대로 축소 → 글자 크기가 TV와 같은 비율로 보임.
 - 수정 파일: src/lib/timetable.ts, src/app/admin/alarms/page.tsx, src/app/admin/day-plans/page.tsx, src/app/admin/settings/page.tsx, src/components/phone/PhoneTimetable.tsx, README.md
+
+### v16.2 수정
+- 폰 알람의 "카테고리" 탭 삭제. **프로그램 분류**에서 프로그램마다 구분(DX/DP)·브랜드(드롭다운)·상세(직접 입력)를 바로 입력하면 없는 카테고리는 자동 생성(직원 화면에도 반영). 세 칸이 모두 채워지면 자동 저장, 모두 비우면 미분류로 복귀.
+- 프로그램 분류: 프로그램 직접 추가, 어디에도 쓰이지 않는 프로그램 삭제, 여러 개 선택해 한 번에 지정(브랜드·상세를 이름에서 자동 인식 가능, 예: "기아 레벨 1" → 기아 / 레벨 1), 하단 "등록된 카테고리" 접이식 목록에서 이름 수정·삭제.
+- 알람 서식 설정 세로 미리보기 기준을 SERO 4K 43형에 맞춰 1080×1920으로 변경(565×1228, 2160×3840 선택 가능).
+- 수정 파일: src/components/phone/ProgramClassifier.tsx, src/components/phone/CategoryManager.tsx, src/app/admin/phone-alarms/page.tsx, src/app/admin/settings/page.tsx, README.md

@@ -6,7 +6,7 @@ import type { PhoneCategoryRow } from "@/lib/types";
 import { BRANDS, DIVISIONS } from "@/lib/facets";
 import { sortCats } from "./shared";
 
-export default function CategoryManager({ cats, reload }: { cats: PhoneCategoryRow[]; reload: () => Promise<void> }) {
+export default function CategoryManager({ cats, reload, hideAdd }: { cats: PhoneCategoryRow[]; reload: () => Promise<void>; hideAdd?: boolean }) {
   const [division, setDivision] = useState(DIVISIONS[0]);
   const [brand, setBrand] = useState(BRANDS[0]);
   const [name, setName] = useState("");
@@ -55,6 +55,7 @@ export default function CategoryManager({ cats, reload }: { cats: PhoneCategoryR
 
   return (
     <div>
+      {!hideAdd && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 600, marginBottom: 10 }}>카테고리 추가</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -84,6 +85,7 @@ export default function CategoryManager({ cats, reload }: { cats: PhoneCategoryR
           구분(DX/DP) → 브랜드 → 카테고리 순입니다. 같은 이름(예: 베이직 드라이브)을 브랜드별로 각각 추가할 수 있고, 직원 화면에서는 브랜드를 고르면 그 브랜드에 있는 카테고리만 보입니다.
         </div>
       </div>
+      )}
 
       {cats.length === 0 && <div className="card" style={{ color: "var(--muted)", fontSize: 14 }}>등록된 카테고리가 없습니다.</div>}
 
