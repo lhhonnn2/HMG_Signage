@@ -172,3 +172,24 @@ https://your-app.vercel.app/player/5
 - 새 파일: src/lib/playerData.ts, src/components/ServerStatusBox.tsx
 - 수정 파일: src/app/player/[tvId]/page.tsx, src/app/admin/layout.tsx, README.md
 - 이미 켜져 있는 TV는 새로고침해야 새 코드가 적용됩니다.
+
+## 릴리스 v15 — 폰 알림(웹 푸시) + 폰 전용 알람 (2단계)
+
+### 새 기능
+- **직원용 알림 받기 화면** `/notify` (비밀번호 없음): 직원이 폰에서 열고 받을 **TV**와 **폰 전용 카테고리**를 선택 → "알림 받기".
+- **관리자 → 폰 알람** 메뉴: 카테고리 추가/이름변경/삭제, 카테고리별 알람(직접 입력, 엑셀 일괄 등록, 플랜 적용, 날짜 탭, 표 편집, 다른 카테고리로 복사). TV 알람과 같은 방식.
+- 알림 문구: `[프로그램] 시작 N분 전 입니다. [장소]로 와주세요.` (장소 없으면 `[프로그램] 시작 N분 전 입니다.`). N = 시작예정시각 − 알람시각(자동 계산).
+- 같은 프로그램이 여러 TV/카테고리에 있어도 한 폰에는 1번만 전송(중복 방지).
+- TV 송출 화면은 변경 없음.
+
+### 적용 순서
+1. Supabase SQL Editor에서 `supabase/migration_v12.sql` 실행.
+2. Vercel Environment Variables 추가(Production, Preview 모두 체크): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`(예: mailto:본인메일), `CRON_SECRET`. 추가 후 Redeploy.
+3. 외부 스케줄러(cron-job.org, 무료)에서 **1분마다** `https://운영주소/api/push/cron?key=CRON_SECRET값` 호출.
+4. 직원에게 `https://운영주소/notify` 공유. 아이폰은 Safari → 공유 → "홈 화면에 추가" 후 그 아이콘으로 열어 허용해야 함.
+
+### 참고
+- 일반 웹 푸시라 폰이 무음/방해금지면 소리가 나지 않을 수 있음(알람시계처럼 울리지 않음).
+- 알람 시각 후 3분 이내에 서버가 호출될 때만 전송(그 이후 늦게 등록한 과거 알람은 보내지 않음).
+- 새 파일: migration_v12.sql, public/(sw.js, manifest.webmanifest, 아이콘 3개), src/lib/(pushLogic.ts, webpush.ts), src/app/notify/, src/app/api/push/(cron, subscribe, unsubscribe, lookup, test, stats), src/app/admin/phone-alarms/page.tsx
+- 수정 파일: package.json, package-lock.json(web-push 추가), src/lib/types.ts, src/app/admin/layout.tsx, src/app/admin/page.tsx, .env.example, README.md

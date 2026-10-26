@@ -71,6 +71,21 @@ export type AlarmRow = {
   location: string;
 };
 
+export type PhoneCategoryRow = {
+  id: string;
+  name: string;
+};
+
+export type PhoneAlarmRow = {
+  id: string;
+  category_id: string;
+  alarm_date: string; // YYYY-MM-DD
+  alarm_time: string; // HH:MM:SS — when the phone notification is sent
+  scheduled_time: string; // HH:MM:SS — announced start time (used to compute "N분 전")
+  program_name: string;
+  location: string;
+};
+
 export type DayPlanRow = {
   id: string;
   name: string;
