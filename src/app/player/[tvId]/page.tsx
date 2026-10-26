@@ -3,6 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { renderAlarmLines, DEFAULT_TEMPLATE, contrastTextColor } from "@/lib/types";
+import {
+  alarmDateRange,
+  createSerializedRunner,
+  emptySnapshot,
+  loadSnapshot,
+  mergeResults,
+  safeQuery,
+  saveSnapshot,
+  serializeSnapshot
+} from "@/lib/playerData";
+import type { PlayerSnapshot } from "@/lib/playerData";
 import type {
   AlarmRow,
   AlarmSettingsRow,
@@ -16,11 +27,6 @@ import type {
 } from "@/lib/types";
 
 const ROTATE_EVERY_MS = 5000; // how long each pair/leftover of overlapping alarms shows before rotating
-
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function alarmStart(a: AlarmRow) {
   return new Date(`${a.alarm_date}T${a.alarm_time}`);
@@ -70,27 +76,64 @@ export default function PlayerPage({ params }: { params: { tvId: string } }) {
   const [now, setNow] = useState(new Date());
   const [rotateIndex, setRotateIndex] = useState(0);
 
-  async function loadData() {
-    const [imgsRes, setsRes, settingsRes, audioRes, fontsRes, alarmsRes, alarmSettingsRes] = await Promise.all([
-      supabase.from("images").select("*"),
-      supabase.from("scheduled_image_sets").select("*").eq("tv_id", tvId),
-      supabase.from("tv_settings").select("*").eq("tv_id", tvId).maybeSingle(),
-      supabase.from("tv_audio").select("*").eq("tv_id", tvId).maybeSingle(),
-      supabase.from("fonts").select("*"),
-      supabase.from("alarms").select("*").eq("alarm_date", todayStr()).eq("tv_id", tvId),
-      supabase.from("alarm_settings").select("*").eq("id", 1).maybeSingle()
-    ]);
+  // Latest known-good data. Failed/timed-out queries never overwrite it.
+  const snapRef = useRef<PlayerSnapshot>(emptySnapshot());
 
-    setImages(imgsRes.data || []);
-    setScheduledSets(setsRes.data || []);
-    if (settingsRes.data) setSettings(settingsRes.data as TvSettingsRow);
-    setAudio((audioRes.data as TvAudioRow) || null);
-    setFonts(fontsRes.data || []);
-    setAlarms((alarmsRes.data as AlarmRow[]) || []);
-    if (alarmSettingsRes.data) setAlarmSettings(alarmSettingsRes.data as AlarmSettingsRow);
+  function applySnapshot(snap: PlayerSnapshot) {
+    snapRef.current = snap;
+    setImages(snap.images);
+    setScheduledSets(snap.scheduledSets);
+    if (snap.settings) setSettings(snap.settings);
+    setAudio(snap.audio);
+    setFonts(snap.fonts);
+    setAlarms(snap.alarms);
+    if (snap.alarmSettings) setAlarmSettings(snap.alarmSettings);
   }
 
+  async function fetchAll() {
+    const range = alarmDateRange(new Date(), 3);
+    const [images, scheduledSets, settings, audio, fonts, alarms, alarmSettings] = await Promise.all([
+      safeQuery<ImageRow[]>(supabase.from("images").select("*") as any),
+      safeQuery<ScheduledImageSetRow[]>(supabase.from("scheduled_image_sets").select("*").eq("tv_id", tvId) as any),
+      safeQuery<TvSettingsRow>(supabase.from("tv_settings").select("*").eq("tv_id", tvId).maybeSingle() as any),
+      safeQuery<TvAudioRow>(supabase.from("tv_audio").select("*").eq("tv_id", tvId).maybeSingle() as any),
+      safeQuery<FontRow[]>(supabase.from("fonts").select("*") as any),
+      safeQuery<AlarmRow[]>(
+        supabase.from("alarms").select("*").gte("alarm_date", range.from).lte("alarm_date", range.to).eq("tv_id", tvId) as any
+      ),
+      safeQuery<AlarmSettingsRow>(supabase.from("alarm_settings").select("*").eq("id", 1).maybeSingle() as any)
+    ]);
+    const { next, okCount, failCount } = mergeResults(snapRef.current, {
+      images, scheduledSets, settings, audio, fonts, alarms, alarmSettings
+    });
+    if (failCount > 0) console.warn(`[player] ${failCount} request(s) failed; keeping previous data`);
+    if (okCount > 0) {
+      applySnapshot(next);
+      // Save only when every request succeeded, so a half-failed refresh
+      // can't store a mix that looks complete.
+      if (failCount === 0) {
+        try {
+          saveSnapshot(window.localStorage, tvId, serializeSnapshot(next));
+        } catch {}
+      }
+    }
+  }
+
+  // One stable runner: refreshes never overlap, and a trigger that arrives
+  // mid-refresh runs once more afterwards.
+  const fetchAllRef = useRef(fetchAll);
+  fetchAllRef.current = fetchAll;
+  const runnerRef = useRef<(() => Promise<void>) | null>(null);
+  if (!runnerRef.current) runnerRef.current = createSerializedRunner(() => fetchAllRef.current());
+  const loadData = () => runnerRef.current!();
+
   useEffect(() => {
+    // Show the last saved data immediately (works even if the server is down).
+    try {
+      const cached = loadSnapshot(window.localStorage, tvId);
+      if (cached) applySnapshot(cached);
+    } catch {}
+
     loadData();
     const dataTimer = setInterval(loadData, 60_000);
 
