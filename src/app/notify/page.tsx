@@ -61,6 +61,25 @@ export default function NotifyPage() {
   // during render could be the build day instead of today.
   const [date, setDate] = useState("");
   const hiddenAt = useRef<number | null>(null);
+  const [guideOpen, setGuideOpen] = useState(true);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("nt-guide-hidden") === "1") setGuideOpen(false);
+    } catch {
+      /* storage unavailable: keep it open */
+    }
+  }, []);
+
+  function toggleGuide() {
+    const next = !guideOpen;
+    setGuideOpen(next);
+    try {
+      localStorage.setItem("nt-guide-hidden", next ? "0" : "1");
+    } catch {
+      /* ignore */
+    }
+  }
   const [dayRows, setDayRows] = useState<PhoneTimetableRow[]>([]);
   const [tab, setTab] = useState<"settings" | "timetable">("settings");
   const [onlyMine, setOnlyMine] = useState(false);
@@ -280,13 +299,20 @@ export default function NotifyPage() {
 
       {support === "ios-install" && tab === "settings" && (
         <div className="nt-notice">
-          <b>아이폰은 홈 화면에 추가해야 알림을 받을 수 있습니다.</b>
-          <ol>
-            <li>Safari로 이 페이지를 엽니다. 카카오톡 등 다른 앱 안에서 열었다면 Safari로 다시 열어주세요.</li>
-            <li>화면 아래 주소창의 왼쪽 끝 <b>≡</b> 버튼(또는 <b>⋯</b>, 공유 버튼 □↑이 보이면 그 버튼)을 누릅니다.</li>
-            <li>메뉴에서 <b>공유</b>를 누르고, 아래로 넘겨서 <b>홈 화면에 추가</b>를 누른 뒤 <b>추가</b>를 누릅니다. 안 보이면 맨 아래 <b>더 보기</b>(⋯) 안을 확인하세요.</li>
-            <li>홈 화면에 생긴 <b>HMG 알림</b> 아이콘으로 다시 열고, 프로그램을 선택한 뒤 <b>알림 받기</b>를 눌러 알림을 허용합니다.</li>
-          </ol>
+          <div className="nt-notice-head">
+            <b>{guideOpen ? "아이폰은 홈 화면에 추가해야 알림을 받을 수 있습니다." : "알림 설정 방법"}</b>
+            <button type="button" className="nt-link" onClick={toggleGuide}>
+              {guideOpen ? "숨기기" : "펼치기"}
+            </button>
+          </div>
+          {guideOpen && (
+            <ol>
+              <li>Safari로 이 페이지를 엽니다. 카카오톡 등 다른 앱 안에서 열었다면 Safari로 다시 열어주세요.</li>
+              <li>화면 아래 주소창의 왼쪽 끝 <b>≡</b> 버튼(또는 <b>⋯</b>, 공유 버튼 □↑이 보이면 그 버튼)을 누릅니다.</li>
+              <li>메뉴에서 <b>공유</b>를 누르고, 아래로 넘겨서 <b>홈 화면에 추가</b>를 누른 뒤 <b>추가</b>를 누릅니다. 안 보이면 맨 아래 <b>더 보기</b>(⋯) 안을 확인하세요.</li>
+              <li>홈 화면에 생긴 <b>HMG 알림</b> 아이콘으로 다시 열고, 프로그램을 선택한 뒤 <b>알림 받기</b>를 눌러 알림을 허용합니다.</li>
+            </ol>
+          )}
         </div>
       )}
       {support === "unsupported" && (

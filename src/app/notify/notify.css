@@ -55,6 +55,16 @@
   background: #fbeeee;
   color: #9b1c1c;
 }
+.nt-notice-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nt-notice-head .nt-link {
+  flex-shrink: 0;
+  color: var(--nt-ink);
+}
 .nt-notice ol {
   margin: 6px 0 0;
   padding-left: 20px;
