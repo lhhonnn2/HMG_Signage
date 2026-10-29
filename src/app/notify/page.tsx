@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabaseClient";
 import type { PhoneCategoryRow, PhoneProgramRow, PhoneTimetableRow } from "@/lib/types";
 import {
   LEAD_OPTIONS,
-  catLabel,
   catMatches,
   clearRow,
   emptyFacets,
@@ -369,10 +368,7 @@ export default function NotifyPage() {
                     <div className="nt-time">{r.start_time.slice(0, 5)}</div>
                     <div className="nt-item-main">
                       <div className="nt-item-name">{r.program_name || "(이름 없음)"}</div>
-                      <div className="nt-item-meta">
-                        {r.location ? `${r.location} · ` : ""}
-                        {s.cat ? catLabel(s.cat) : "미분류"}
-                      </div>
+                      {r.location && <div className="nt-item-meta">{r.location}</div>}
                     </div>
                     <button type="button" className="nt-toggle" aria-pressed={s.on} onClick={() => toggleProgram(r.program_name)}>
                       {s.on ? "받는 중" : "안 받음"}

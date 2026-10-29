@@ -246,3 +246,8 @@ https://your-app.vercel.app/player/5
 - 전체 UI 폰트를 현대 하모니로 변경: 기본 L, 굵은 글씨(font-weight 500 이상)는 M. 파일은 public/fonts/HarmonyL.woff2, HarmonyM.woff2 (원본 TTF를 woff2로 변환), 정의는 src/app/globals.css
 - TV 송출 알람 화면: 알람 서식에서 별도 폰트를 고르지 않은 경우 하모니가 기본으로 적용됨 (직접 고른 폰트는 그대로)
 - /notify: 파스텔 박스·색 줄·알약 버튼·이모지를 없애고, 흰 바탕 + 남색(#002c5f) 한 가지 강조색, 선 구분형 레이아웃으로 정리 (src/app/notify/notify.css 신규)
+
+## v16.6 — 현대산스 폰트 + /notify 상단 배너
+- 폰트를 현대산스 Head KR(Light 기본 / Medium 굵게)로 교체. 한글·영문·기호만 남긴 woff2 (public/fonts/HyundaiSansL.woff2, HyundaiSansM.woff2). 하모니 폰트 파일은 삭제됨
+- /notify 상단에 센터 사진 배너(public/images/center-banner.jpg) + 제목 (글씨 가독성을 위해 아래쪽 어두운 그라데이션)
+- 타임테이블 확인에서 프로그램 밑의 분류 표시(DP · 현대 · …) 제거, 장소가 있으면 장소만 표시

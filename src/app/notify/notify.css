@@ -20,18 +20,28 @@
 }
 
 .nt-head {
-  padding: 22px 20px 14px;
+  height: 176px;
+  margin-bottom: 14px;
+  padding: 0 20px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  color: #fff;
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0) 80%),
+    #111 url("/images/center-banner.jpg") 62% 50% / cover no-repeat;
 }
 .nt-head h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 25px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .nt-head p {
   margin: 6px 0 0;
   font-size: 13.5px;
-  color: var(--nt-sub);
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .nt-notice {
