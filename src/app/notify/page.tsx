@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { PhoneCategoryRow, PhoneProgramRow, PhoneTimetableRow } from "@/lib/types";
 import {
@@ -57,7 +57,10 @@ export default function NotifyPage() {
   const [lead, setLead] = useState(5);
   const [excluded, setExcluded] = useState<string[]>([]);
   const [extra, setExtra] = useState<string[]>([]);
-  const [date, setDate] = useState(todayStr());
+  // Empty until mounted: the page is prerendered at build time, so a date computed
+  // during render could be the build day instead of today.
+  const [date, setDate] = useState("");
+  const hiddenAt = useRef<number | null>(null);
   const [dayRows, setDayRows] = useState<PhoneTimetableRow[]>([]);
   const [tab, setTab] = useState<"settings" | "timetable">("settings");
   const [onlyMine, setOnlyMine] = useState(false);
@@ -79,7 +82,32 @@ export default function NotifyPage() {
       .then(({ data }) => setProgMap(new Map(((data as PhoneProgramRow[]) || []).map((p) => [normalizeProgram(p.name), p.category_id]))));
   }, []);
 
+  // Always start on today, and jump back to today when the app is reopened after
+  // being away for a while (installed apps stay in memory) or after midnight.
   useEffect(() => {
+    let lastDay = todayStr();
+    setDate(lastDay);
+    function onVisible() {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current = Date.now();
+        return;
+      }
+      const away = hiddenAt.current ? Date.now() - hiddenAt.current : 0;
+      hiddenAt.current = null;
+      const today = todayStr();
+      if (today !== lastDay || away >= 10 * 60 * 1000) setDate(today);
+      lastDay = today;
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onVisible);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!date) return;
     supabase
       .from("phone_timetable")
       .select("*")
@@ -250,7 +278,7 @@ export default function NotifyPage() {
         <p>받을 프로그램을 정해 두면 시작 전에 이 폰으로 알림이 갑니다.</p>
       </div>
 
-      {support === "ios-install" && (
+      {support === "ios-install" && tab === "settings" && (
         <div className="nt-notice">
           <b>아이폰은 홈 화면에 추가해야 알림을 받을 수 있습니다.</b>
           <ol>

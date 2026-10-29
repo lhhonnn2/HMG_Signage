@@ -251,3 +251,9 @@ https://your-app.vercel.app/player/5
 - 폰트를 현대산스 Head KR(Light 기본 / Medium 굵게)로 교체. 한글·영문·기호만 남긴 woff2 (public/fonts/HyundaiSansL.woff2, HyundaiSansM.woff2). 하모니 폰트 파일은 삭제됨
 - /notify 상단에 센터 사진 배너(public/images/center-banner.jpg) + 제목 (글씨 가독성을 위해 아래쪽 어두운 그라데이션)
 - 타임테이블 확인에서 프로그램 밑의 분류 표시(DP · 현대 · …) 제거, 장소가 있으면 장소만 표시
+
+## v16.7
+- 아이폰 홈 화면 추가 안내는 "알림 설정" 탭에서만 표시 (타임테이블 확인 탭에서는 숨김)
+
+## v16.8
+- /notify 타임테이블 확인: 열 때 항상 오늘 날짜로 시작. 앱을 10분 이상 닫아뒀다가 다시 열거나 자정이 지나면 오늘로 자동 이동 (직접 고른 날짜는 그 사이에만 유지)
