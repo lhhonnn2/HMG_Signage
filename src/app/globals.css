@@ -2,22 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: "HyundaiSansHead";
-  src: url("/fonts/HyundaiSansL.woff2") format("woff2");
-  font-weight: 100 499;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "HyundaiSansHead";
-  src: url("/fonts/HyundaiSansM.woff2") format("woff2");
-  font-weight: 500 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --ink: #14161c;
   --muted: #6b7280;
@@ -35,9 +19,8 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: "HyundaiSansHead", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
   -webkit-font-smoothing: antialiased;
-  font-synthesis: none;
 }
 
 * {
