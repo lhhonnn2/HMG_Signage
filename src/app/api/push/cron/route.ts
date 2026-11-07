@@ -5,6 +5,7 @@ import { buildMessage, kstDates, normalizeProgram, planSends, type PushSub, type
 import type { CatInfo } from "@/lib/facets";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 export const runtime = "nodejs";
 
 // Called every minute by an external scheduler (cron-job.org).
