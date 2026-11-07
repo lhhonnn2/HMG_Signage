@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { pushConfigured } from "@/lib/webpush";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Only a count (no endpoints/keys) — shown on the admin phone-alarm page.
 export async function GET() {
