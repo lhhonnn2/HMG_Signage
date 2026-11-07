@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { isGone, pushConfigured, sendPush } from "@/lib/webpush";
 import { buildMessage, kstDates, normalizeProgram, planSends, type PushSub, type TimetableRow } from "@/lib/pushLogic";
 import type { CatInfo } from "@/lib/facets";
+import { pruneRuns, recordRun, type RunError } from "@/lib/pushRuns";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -31,7 +32,10 @@ async function handle(req: NextRequest) {
       .select("id, endpoint, p256dh, auth, divisions, brands, category_names, excluded_programs, extra_programs, lead_minutes")
   ]);
   const err = ttRes.error || progRes.error || catRes.error || subRes.error;
-  if (err) return NextResponse.json({ error: err.message }, { status: 500 });
+  if (err) {
+    await recordRun(sb, { errors: [{ message: "DB: " + err.message }] });
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 
   const catById = new Map<string, CatInfo>((catRes.data || []).map((c: any) => [c.id, { division: c.division, brand: c.brand, name: c.name }]));
   const catByProgram = new Map<string, CatInfo>();
@@ -47,6 +51,7 @@ async function handle(req: NextRequest) {
   let sent = 0;
   let failed = 0;
   let removed = 0;
+  const errors: RunError[] = [];
 
   if (plan.length > 0) {
     // Claim first: only rows that are newly inserted get sent (dedupe).
@@ -57,7 +62,10 @@ async function handle(req: NextRequest) {
         { onConflict: "subscription_id,dedupe_key", ignoreDuplicates: true }
       )
       .select("id, subscription_id, dedupe_key");
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      await recordRun(sb, { planned: plan.length, errors: [{ message: "DB: " + error.message }] });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     const planMap = new Map(plan.map((p) => [`${p.sub.id}#${p.key}`, p]));
     await Promise.all(
@@ -73,7 +81,9 @@ async function handle(req: NextRequest) {
           if (isGone(e)) {
             await sb.from("push_subscriptions").delete().eq("id", sub.id);
             removed++;
+            errors.push({ status: e.statusCode ?? null, message: "구독 만료로 삭제", program: p.row.program_name, sub: sub.id.slice(0, 8) });
           } else {
+            errors.push({ status: e.statusCode ?? null, message: String(e.message || e).slice(0, 120), program: p.row.program_name, sub: sub.id.slice(0, 8) });
             // transient failure: release the claim so the next minute retries
             await sb.from("push_log").delete().eq("id", c.id);
             failed++;
@@ -83,6 +93,8 @@ async function handle(req: NextRequest) {
     );
   }
 
+  await recordRun(sb, { planned: plan.length, sent, failed, removed, errors });
+  await pruneRuns(sb, nowMs);
   await sb.from("push_log").delete().lt("sent_at", new Date(nowMs - 7 * 24 * 3600 * 1000).toISOString());
 
   return NextResponse.json({ ok: true, planned: plan.length, sent, failed, removed });

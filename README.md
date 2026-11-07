@@ -263,3 +263,14 @@ https://your-app.vercel.app/player/5
 
 ## v16.10
 - 폰트를 원래대로 되돌림(기존 시스템 기본 폰트). 하모니/현대산스 폰트 정의와 public/fonts 폴더 제거
+
+## v17 — 폰 알람 관리 (구독 기기 / 발송 현황 / 전체 공지)
+- **먼저 `supabase/migration_v14.sql` 을 Supabase SQL Editor에서 실행** (push_runs, push_announcements 생성. 안 해도 알림 발송은 정상이고, 새 탭들에 안내 문구가 뜹니다)
+- 관리자 > 폰 알람에 탭 3개 추가
+  - **발송 현황**: cron-job.org 마지막 호출 시각(5분 넘게 멈추면 빨간 경고), 오늘/어제 발송 성공·실패·만료 삭제 건수, 최근 7일 발송 기록과 실패 사유
+  - **구독 기기**: 기기(아이폰/안드로이드/PC·브라우저), 푸시 서비스, 몇 분 전, 받는 범위, 개별 설정, 등록·마지막 저장 시각, 삭제 버튼
+  - **전체 공지**: 제목·내용(200자)을 알림 받는 모든 기기에 한 번에 발송, 보낸 기록 20건
+- cron은 매분 실행 기록(push_runs)을 남기고 7일 지난 기록은 자동 삭제
+- `/api/push/stats` 개수가 오래된 값으로 고정되던 문제 수정 (fetchCache = force-no-store, cron에도 동일 적용)
+- 관리자 전용 API는 관리자 비밀번호 쿠키가 없으면 401 (src/lib/adminAuth.ts)
+- 진단용 `/api/push/debug` 삭제, `/notify` 결과 문구 위치는 기존 그대로

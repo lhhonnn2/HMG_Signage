@@ -6,8 +6,11 @@ import type { PhoneCategoryRow, PhoneProgramRow } from "@/lib/types";
 import { normalizeProgram } from "@/lib/pushLogic";
 import PhoneTimetable from "@/components/phone/PhoneTimetable";
 import ProgramClassifier from "@/components/phone/ProgramClassifier";
+import DeliveryStatus from "@/components/phone/DeliveryStatus";
+import SubscriberList from "@/components/phone/SubscriberList";
+import Announcements from "@/components/phone/Announcements";
 
-type Tab = "timetable" | "programs";
+type Tab = "timetable" | "programs" | "status" | "devices" | "announce";
 type Stats = { configured: boolean; cronSecretSet: boolean; total: number };
 
 export default function PhoneAlarmsPage() {
@@ -28,13 +31,17 @@ export default function PhoneAlarmsPage() {
     setProgMap(new Map(((data as PhoneProgramRow[]) || []).map((p) => [normalizeProgram(p.name), p.category_id])));
   }
 
-  useEffect(() => {
-    loadCats();
-    loadPrograms();
-    fetch("/api/push/stats")
+  function loadStats() {
+    fetch("/api/push/stats", { cache: "no-store" })
       .then((r) => r.json())
       .then(setStats)
       .catch(() => setStats(null));
+  }
+
+  useEffect(() => {
+    loadCats();
+    loadPrograms();
+    loadStats();
   }, []);
 
   const notifyUrl = typeof window !== "undefined" ? `${window.location.origin}/notify` : "/notify";
@@ -77,11 +84,23 @@ export default function PhoneAlarmsPage() {
         <button className="chip" data-active={tab === "programs"} onClick={() => setTab("programs")}>
           프로그램 분류
         </button>
+        <button className="chip" data-active={tab === "status"} onClick={() => setTab("status")}>
+          발송 현황
+        </button>
+        <button className="chip" data-active={tab === "devices"} onClick={() => setTab("devices")}>
+          구독 기기
+        </button>
+        <button className="chip" data-active={tab === "announce"} onClick={() => setTab("announce")}>
+          전체 공지
+        </button>
       </div>
 
       {tab === "timetable" && (
         <PhoneTimetable cats={cats} progMap={progMap} reloadPrograms={loadPrograms} onChanged={() => setRefreshKey((k) => k + 1)} />
       )}
+      {tab === "status" && <DeliveryStatus />}
+      {tab === "devices" && <SubscriberList onChanged={loadStats} />}
+      {tab === "announce" && <Announcements />}
       {tab === "programs" && (
         <ProgramClassifier cats={cats} progMap={progMap} reloadCats={loadCats} reloadPrograms={loadPrograms} refreshKey={refreshKey} />
       )}

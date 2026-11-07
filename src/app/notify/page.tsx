@@ -440,6 +440,7 @@ export default function NotifyPage() {
       </div>
 
       {subscribed && support === "ok" && <div className="nt-msg ok">이 폰은 알림을 받는 중입니다. 선택을 바꿨다면 "선택 저장"을 눌러야 적용됩니다.</div>}
+
       {msg && <div className={"nt-msg " + (msg.ok ? "ok" : "err")}>{msg.text}</div>}
 
       <div className="nt-foot">
